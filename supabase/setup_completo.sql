@@ -455,11 +455,7 @@ insert into regions (nome, uf, ddd, descricao, ordem) values ('068 Rio Branco e 
 insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 select r.id, v.* from regions r, (values
   ('Rio Branco', 'Rio Branco,State of Acre,Brazil', 'City', 'minima', '68', null::timestamptz),
-  ('Cruzeiro do Sul', 'Cruzeiro do Sul,State of Acre,Brazil', 'City', 'media', '68', null::timestamptz),
-  ('Sena Madureira', 'Sena Madureira,State of Acre,Brazil', 'City', 'ampla', '68', null::timestamptz),
-  ('Tarauacá', 'Tarauaca,State of Acre,Brazil', 'City', 'ampla', '68', null::timestamptz),
-  ('Feijó', 'Feijo,State of Acre,Brazil', 'City', 'ampla', '68', null::timestamptz),
-  ('Senador Guiomard', 'Senador Guiomard,State of Acre,Brazil', 'City', 'ampla', '68', null::timestamptz)
+  ('Cruzeiro do Sul', 'Cruzeiro do Sul,State of Acre,Brazil', 'City', 'media', '68', null::timestamptz)
 ) as v(nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 where r.nome = '068 Rio Branco e região'
 on conflict (region_id, serpapi_canonical) do nothing;
@@ -483,10 +479,7 @@ insert into regions (nome, uf, ddd, descricao, ordem) values ('096 Macapá e reg
 insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 select r.id, v.* from regions r, (values
   ('Macapá', 'Macapa,State of Amapa,Brazil', 'City', 'minima', '96', null::timestamptz),
-  ('Santana', 'Santana,State of Amapa,Brazil', 'City', 'media', '96', null::timestamptz),
-  ('Laranjal do Jari', 'Laranjal do Jari,State of Amapa,Brazil', 'City', 'ampla', '96', null::timestamptz),
-  ('Oiapoque', 'Oiapoque,State of Amapa,Brazil', 'City', 'ampla', '96', null::timestamptz),
-  ('Mazagão', 'Mazagao,State of Amapa,Brazil', 'City', 'ampla', '96', null::timestamptz)
+  ('Santana', 'Santana,State of Amapa,Brazil', 'City', 'media', '96', null::timestamptz)
 ) as v(nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 where r.nome = '096 Macapá e região'
 on conflict (region_id, serpapi_canonical) do nothing;
@@ -498,7 +491,6 @@ select r.id, v.* from regions r, (values
   ('Manaus', 'Manaus,State of Amazonas,Brazil', 'City', 'minima', '92', null::timestamptz),
   ('Manacapuru', 'Manacapuru,State of Amazonas,Brazil', 'City', 'media', '92', null::timestamptz),
   ('Itacoatiara', 'Itacoatiara,State of Amazonas,Brazil', 'City', 'media', '92', null::timestamptz),
-  ('Iranduba', 'Iranduba,State of Amazonas,Brazil', 'City', 'ampla', '92', null::timestamptz),
   ('Parintins', 'Parintins,State of Amazonas,Brazil', 'City', 'ampla', '92', null::timestamptz),
   ('Coari', 'Coari,State of Amazonas,Brazil', 'City', 'ampla', '97', null::timestamptz)
 ) as v(nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
@@ -558,7 +550,6 @@ select r.id, v.* from regions r, (values
   ('São Luís', 'Sao Luis,State of Maranhao,Brazil', 'City', 'minima', '98', null::timestamptz),
   ('São José de Ribamar', 'Sao Jose de Ribamar,State of Maranhao,Brazil', 'City', 'media', '98', null::timestamptz),
   ('Paço do Lumiar', 'Paco do Lumiar,State of Maranhao,Brazil', 'City', 'media', '98', null::timestamptz),
-  ('Raposa', 'Raposa,State of Maranhao,Brazil', 'City', 'ampla', '98', null::timestamptz),
   ('Imperatriz', 'Imperatriz,State of Maranhao,Brazil', 'City', 'ampla', '99', null::timestamptz),
   ('Timon', 'Timon,State of Maranhao,Brazil', 'City', 'ampla', '99', null::timestamptz),
   ('Caxias', 'Caxias,State of Maranhao,Brazil', 'City', 'ampla', '99', null::timestamptz)
@@ -602,7 +593,6 @@ select r.id, v.* from regions r, (values
   ('Belém', 'Belem,State of Para,Brazil', 'City', 'minima', '91', null::timestamptz),
   ('Ananindeua', 'Ananindeua,State of Para,Brazil', 'City', 'media', '91', null::timestamptz),
   ('Marituba', 'Marituba,State of Para,Brazil', 'City', 'media', '91', null::timestamptz),
-  ('Benevides', 'Benevides,State of Para,Brazil', 'City', 'ampla', '91', null::timestamptz),
   ('Castanhal', 'Castanhal,State of Para,Brazil', 'City', 'ampla', '91', null::timestamptz),
   ('Santa Izabel do Pará', 'Santa Izabel do Para,State of Para,Brazil', 'City', 'ampla', '91', null::timestamptz),
   ('Abaetetuba', 'Abaetetuba,State of Para,Brazil', 'City', 'ampla', '91', null::timestamptz)
@@ -619,7 +609,6 @@ select r.id, v.* from regions r, (values
   ('Santa Rita', 'Santa Rita,State of Paraiba,Brazil', 'City', 'media', '83', null::timestamptz),
   ('Bayeux', 'Bayeux,State of Paraiba,Brazil', 'City', 'media', '83', null::timestamptz),
   ('Cabedelo', 'Cabedelo,State of Paraiba,Brazil', 'City', 'ampla', '83', null::timestamptz),
-  ('Conde', 'Conde,State of Paraiba,Brazil', 'City', 'ampla', '83', null::timestamptz),
   ('Patos', 'Patos,State of Paraiba,Brazil', 'City', 'ampla', '83', null::timestamptz)
 ) as v(nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 where r.nome = '083 João Pessoa e região'
@@ -646,10 +635,7 @@ insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada
 select r.id, v.* from regions r, (values
   ('Teresina', 'Teresina,State of Piaui,Brazil', 'City', 'minima', '86', null::timestamptz),
   ('Parnaíba', 'Parnaiba,State of Piaui,Brazil', 'City', 'media', '86', null::timestamptz),
-  ('Picos', 'Picos,State of Piaui,Brazil', 'City', 'ampla', '89', null::timestamptz),
-  ('Altos', 'Altos,State of Piaui,Brazil', 'City', 'ampla', '86', null::timestamptz),
-  ('José de Freitas', 'Jose de Freitas,State of Piaui,Brazil', 'City', 'ampla', '86', null::timestamptz),
-  ('Campo Maior', 'Campo Maior,State of Piaui,Brazil', 'City', 'ampla', '86', null::timestamptz)
+  ('Picos', 'Picos,State of Piaui,Brazil', 'City', 'ampla', '89', null::timestamptz)
 ) as v(nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 where r.nome = '086 Teresina e região'
 on conflict (region_id, serpapi_canonical) do nothing;
@@ -718,11 +704,7 @@ insert into regions (nome, uf, ddd, descricao, ordem) values ('095 Boa Vista e r
   on conflict (nome) do update set uf = excluded.uf, ddd = excluded.ddd, descricao = excluded.descricao, ordem = excluded.ordem;
 insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 select r.id, v.* from regions r, (values
-  ('Boa Vista', 'Boa Vista,State of Roraima,Brazil', 'City', 'minima', '95', null::timestamptz),
-  ('Rorainópolis', 'Rorainopolis,State of Roraima,Brazil', 'City', 'media', '95', null::timestamptz),
-  ('Caracaraí', 'Caracarai,State of Roraima,Brazil', 'City', 'ampla', '95', null::timestamptz),
-  ('Alto Alegre', 'Alto Alegre,State of Roraima,Brazil', 'City', 'ampla', '95', null::timestamptz),
-  ('Mucajaí', 'Mucajai,State of Roraima,Brazil', 'City', 'ampla', '95', null::timestamptz)
+  ('Boa Vista', 'Boa Vista,State of Roraima,Brazil', 'City', 'minima', '95', null::timestamptz)
 ) as v(nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 where r.nome = '095 Boa Vista e região'
 on conflict (region_id, serpapi_canonical) do nothing;
@@ -734,7 +716,6 @@ select r.id, v.* from regions r, (values
   ('Aracaju', 'Aracaju,State of Sergipe,Brazil', 'City', 'minima', '79', null::timestamptz),
   ('Nossa Senhora do Socorro', 'Nossa Senhora do Socorro,State of Sergipe,Brazil', 'City', 'media', '79', null::timestamptz),
   ('São Cristóvão', 'Sao Cristovao,State of Sergipe,Brazil', 'City', 'media', '79', null::timestamptz),
-  ('Barra dos Coqueiros', 'Barra dos Coqueiros,State of Sergipe,Brazil', 'City', 'ampla', '79', null::timestamptz),
   ('Itabaiana', 'Itabaiana,State of Sergipe,Brazil', 'City', 'ampla', '79', null::timestamptz),
   ('Lagarto', 'Lagarto,State of Sergipe,Brazil', 'City', 'ampla', '79', null::timestamptz)
 ) as v(nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
@@ -749,8 +730,7 @@ select r.id, v.* from regions r, (values
   ('Araguaína', 'Araguaina,State of Tocantins,Brazil', 'City', 'media', '63', null::timestamptz),
   ('Gurupi', 'Gurupi,State of Tocantins,Brazil', 'City', 'media', '63', null::timestamptz),
   ('Porto Nacional', 'Porto Nacional,State of Tocantins,Brazil', 'City', 'ampla', '63', null::timestamptz),
-  ('Paraíso do Tocantins', 'Paraiso do Tocantins,State of Tocantins,Brazil', 'City', 'ampla', '63', null::timestamptz),
-  ('Miracema do Tocantins', 'Miracema do Tocantins,State of Tocantins,Brazil', 'City', 'ampla', '63', null::timestamptz)
+  ('Paraíso do Tocantins', 'Paraiso do Tocantins,State of Tocantins,Brazil', 'City', 'ampla', '63', null::timestamptz)
 ) as v(nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 where r.nome = '063 Palmas e região'
 on conflict (region_id, serpapi_canonical) do nothing;
@@ -838,5 +818,5 @@ insert into settings (chave, valor) values ('reverificar_site_dias', '7'::jsonb)
 
 insert into equipe (nome) values ('Gabriel') on conflict (nome) do nothing;
 
--- Conferência: deve mostrar 27 estados, 34 regiões e 227 pontos
+-- Conferência
 select (select count(distinct uf) from regions) as estados, (select count(*) from regions) as regioes, (select count(*) from locations) as pontos;
