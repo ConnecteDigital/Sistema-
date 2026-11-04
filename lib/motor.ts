@@ -107,10 +107,19 @@ export async function progresso(runId: number): Promise<Progresso> {
     contar("ok"), contar("erro"),
     db().from("run_advertisers").select("id", { count: "exact", head: true }).eq("run_id", runId),
   ]);
-  const status = run.data?.status ?? "erro";
+  if (run.error || !run.data) {
+    // Erro de leitura NÃO é "rodada terminada": mostra o motivo (ex.: falta rodar migration no banco)
+    return {
+      status: "desconhecido", total: 0, feitas: ok.count ?? 0, erros: erro.count ?? 0, anunciantes: 0,
+      erro: "Erro ao ler a rodada no banco: " + (run.error?.message ?? "não encontrada") +
+        ". Se falar de coluna/função que não existe, rode o 0003_motor.sql no Supabase.",
+      terminou: false,
+    };
+  }
+  const status = run.data.status;
   return {
-    status, total: run.data?.total_buscas ?? 0, feitas: ok.count ?? 0, erros: erro.count ?? 0,
-    anunciantes: anunc.count ?? 0, erro: run.data?.erro ?? null,
+    status, total: run.data.total_buscas ?? 0, feitas: ok.count ?? 0, erros: erro.count ?? 0,
+    anunciantes: anunc.count ?? 0, erro: run.data.erro ?? null,
     terminou: status === "pronta" || status === "erro",
   };
 }

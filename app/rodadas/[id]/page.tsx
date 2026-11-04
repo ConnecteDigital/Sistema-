@@ -55,7 +55,7 @@ export default async function Rodada({ params }: { params: Promise<{ id: string 
 
       {linhas.length > 0 ? (
         <TabelaAnunciantes linhas={linhas} />
-      ) : prog.terminou ? (
+      ) : prog.status === "pronta" ? (
         <p className="cartao p-4 text-sm text-suave">Nenhum anúncio encontrado nesta rodada.</p>
       ) : null}
 
