@@ -171,6 +171,7 @@ Tabela `regions` (ex.: "011 Capital", "011 ABC", "013 Baixada Santista", "019 Ca
 - Na hora de cadastrar, validar cada ponto no `locations.json` (grátis).
 - O DDD esperado é usado na regra "telefone com DDD fora da região".
 - O apêndice A traz o seed inicial já validado.
+- **Revisão 2 (04/11/2026) — Brasil inteiro:** os 27 estados estão no catálogo. Cada estado tem uma região "capital e região" com a capital (camada mínima) e as 5–7 cidades grandes mais próximas (média/ampla), cada uma com seu DDD. SP mantém as regiões detalhadas (011 Capital por distritos, ABC, Grande SP, 012, 013, 016, 019). Os pontos novos entram como "não validados" e são conferidos pelo botão "Validar locais" (grátis), que corrige o nome sozinho quando há um equivalente no mesmo estado e desativa o que não existe na SerpApi. A tela de pesquisa agrupa por **estado → região → tamanho**.
 
 ---
 

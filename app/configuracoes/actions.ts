@@ -83,37 +83,60 @@ export async function removerPessoa(form: FormData): Promise<void> {
   revalidatePath("/configuracoes");
 }
 
-/** Confere no locations.json (grátis) os pontos ainda não validados. */
+/**
+ * Confere no locations.json (grátis) os pontos ainda não validados, em lotes de 60 por clique.
+ * Se o nome exato não existir mas houver um equivalente no mesmo estado
+ * (ex.: "Osasco,Osasco,State of Sao Paulo,Brazil"), corrige sozinho.
+ */
 export async function validarLocais(_: Resultado): Promise<Resultado> {
-  const { data, error } = await db().from("locations")
-    .select("id, nome_exibicao, serpapi_canonical").is("validado_em", null).eq("ativo", true);
+  const LOTE = 60;
+  const { data, error, count } = await db().from("locations")
+    .select("id, nome_exibicao, serpapi_canonical", { count: "exact" })
+    .is("validado_em", null).eq("ativo", true).order("id").limit(LOTE);
   if (error) return { ok: false, msg: error.message };
   if (!data?.length) return { ok: true, msg: "Todos os pontos já estão validados." };
 
-  const invalidos: string[] = [];
-  let validos = 0;
+  const problemas: string[] = [];
+  let validos = 0, corrigidos = 0;
   const fila = [...data];
   async function trabalhador() {
     for (let l = fila.shift(); l; l = fila.shift()) {
       try {
-        const nome = l.serpapi_canonical.split(",")[0];
-        const achados = await buscarLocais(nome, 20);
+        const partes = l.serpapi_canonical.split(",");
+        const cidade = partes[0];
+        const estado = "," + partes.slice(-2).join(",");          // ",State of X,Brazil"
+        const achados = await buscarLocais(cidade, 20);
+        const agora = new Date().toISOString();
         if (achados.some((a) => a.canonical_name === l.serpapi_canonical)) {
-          await db().from("locations").update({ validado_em: new Date().toISOString() }).eq("id", l.id);
+          await db().from("locations").update({ validado_em: agora }).eq("id", l.id);
           validos++;
+          continue;
+        }
+        const equivalentes = achados.filter((a) =>
+          a.canonical_name.startsWith(cidade + ",") && a.canonical_name.endsWith(estado));
+        const escolhido = equivalentes.find((a) => a.target_type === "City") ?? equivalentes[0];
+        if (escolhido) {
+          const { error: e } = await db().from("locations")
+            .update({ serpapi_canonical: escolhido.canonical_name, validado_em: agora }).eq("id", l.id);
+          if (e) problemas.push(`${l.nome_exibicao} (erro ao corrigir: ${e.message})`);
+          else corrigidos++;
         } else {
-          const sugestao = achados.find((a) => a.canonical_name.startsWith(nome))?.canonical_name;
-          invalidos.push(`${l.nome_exibicao}${sugestao ? ` (SerpApi sugere: ${sugestao})` : " (não existe no catálogo)"}`);
+          // Não existe no catálogo: desativa para não gastar crédito com local errado
+          await db().from("locations").update({ ativo: false }).eq("id", l.id);
+          problemas.push(`${l.nome_exibicao} (não existe na SerpApi — desativado)`);
         }
       } catch (e) {
-        invalidos.push(`${l.nome_exibicao} (erro: ${e instanceof Error ? e.message : e})`);
+        problemas.push(`${l.nome_exibicao} (erro: ${e instanceof Error ? e.message : e})`);
       }
     }
   }
-  await Promise.all(Array.from({ length: 5 }, trabalhador));
+  await Promise.all(Array.from({ length: 8 }, trabalhador));
   revalidatePath("/configuracoes");
+  const faltam = Math.max(0, (count ?? 0) - data.length);
   return {
-    ok: invalidos.length === 0,
-    msg: `${validos} validados.` + (invalidos.length ? ` Com problema: ${invalidos.join("; ")}` : ""),
+    ok: problemas.length === 0,
+    msg: `${validos} validados` + (corrigidos ? `, ${corrigidos} corrigidos automaticamente` : "") + "." +
+      (problemas.length ? ` Com problema: ${problemas.join("; ")}.` : "") +
+      (faltam ? ` Faltam ${faltam}: clique de novo.` : ""),
   };
 }

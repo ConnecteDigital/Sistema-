@@ -119,6 +119,7 @@ const regioes = [
   { nome: "062 Goiânia e região", uf: "GO", ddd: "62", descricao: "Grande Goiânia", pontos: [
     ["Goiânia", "Goiania" + GO, "City", "minima", 1],
     ["Aparecida de Goiânia", "Aparecida de Goiania" + GO, "City", "media", 1],
+    ["Anápolis", "Anapolis" + GO, "City", "media", 0],
     ["Senador Canedo", "Senador Canedo" + GO, "City", "ampla", 1],
     ["Trindade", "Trindade" + GO, "City", "ampla", 1],
   ]},
@@ -127,6 +128,70 @@ const regioes = [
     ["Várzea Grande", "Varzea Grande" + MT, "City", "media", 1],
   ]},
 ];
+
+// ---------------------------------------------------------------------------
+// Demais estados: capital (mínima) + cidades grandes próximas (média/ampla).
+// Canonical montado sem acento: "<Cidade>,<Estado na SerpApi>,Brazil".
+// Ainda NÃO validados: rodar "Validar locais" em Configurações (grátis).
+// Cidade com DDD diferente da capital: ["Nome", "DDD"].
+// ---------------------------------------------------------------------------
+const semAcento = (t) => t.normalize("NFD").replace(/[̀-ͯ]/g, "");
+function estado(uf, ddd, nomeRegiao, estadoSerp, capital, medias, amplas) {
+  const suf = `,${estadoSerp},Brazil`;
+  const ponto = (item, camada) => {
+    const [nome, dddCidade] = Array.isArray(item) ? item : [item, ddd];
+    return [nome, semAcento(nome) + suf, "City", camada, 0, dddCidade];
+  };
+  return {
+    nome: `0${ddd} ${nomeRegiao}`, uf, ddd, descricao: `Capital de ${uf} e cidades próximas`,
+    pontos: [ponto(capital, "minima"), ...medias.map((c) => ponto(c, "media")), ...amplas.map((c) => ponto(c, "ampla"))],
+  };
+}
+
+regioes.push(
+  estado("AC", "68", "Rio Branco e região", "State of Acre", "Rio Branco",
+    ["Cruzeiro do Sul"], ["Sena Madureira", "Tarauacá", "Feijó", "Senador Guiomard"]),
+  estado("AL", "82", "Maceió e região", "State of Alagoas", "Maceió",
+    ["Arapiraca", "Rio Largo"], ["Marechal Deodoro", "Palmeira dos Índios", "São Miguel dos Campos"]),
+  estado("AP", "96", "Macapá e região", "State of Amapa", "Macapá",
+    ["Santana"], ["Laranjal do Jari", "Oiapoque", "Mazagão"]),
+  estado("AM", "92", "Manaus e região", "State of Amazonas", "Manaus",
+    ["Manacapuru", "Itacoatiara"], ["Iranduba", "Parintins", ["Coari", "97"]]),
+  estado("BA", "71", "Salvador e região", "State of Bahia", "Salvador",
+    ["Lauro de Freitas", "Camaçari", ["Feira de Santana", "75"]], ["Simões Filho", "Candeias", "Dias d'Ávila", ["Vitória da Conquista", "77"]]),
+  estado("CE", "85", "Fortaleza e região", "State of Ceara", "Fortaleza",
+    ["Caucaia", "Maracanaú"], ["Maranguape", "Eusébio", "Aquiraz", ["Juazeiro do Norte", "88"]]),
+  estado("ES", "27", "Vitória e região", "State of Espirito Santo", "Vitória",
+    ["Vila Velha", "Serra", "Cariacica"], ["Guarapari", "Viana", "Linhares"]),
+  estado("MA", "98", "São Luís e região", "State of Maranhao", "São Luís",
+    ["São José de Ribamar", "Paço do Lumiar"], ["Raposa", ["Imperatriz", "99"], ["Timon", "99"], ["Caxias", "99"]]),
+  estado("MS", "67", "Campo Grande e região", "State of Mato Grosso do Sul", "Campo Grande",
+    ["Dourados"], ["Três Lagoas", "Corumbá", "Ponta Porã", "Sidrolândia"]),
+  estado("MG", "31", "Belo Horizonte e região", "State of Minas Gerais", "Belo Horizonte",
+    ["Contagem", "Betim"], ["Nova Lima", "Ribeirão das Neves", "Santa Luzia", "Sete Lagoas"]),
+  estado("PA", "91", "Belém e região", "State of Para", "Belém",
+    ["Ananindeua", "Marituba"], ["Benevides", "Castanhal", "Santa Izabel do Pará", "Abaetetuba"]),
+  estado("PB", "83", "João Pessoa e região", "State of Paraiba", "João Pessoa",
+    ["Campina Grande", "Santa Rita", "Bayeux"], ["Cabedelo", "Conde", "Patos"]),
+  estado("PE", "81", "Recife e região", "State of Pernambuco", "Recife",
+    ["Jaboatão dos Guararapes", "Olinda", "Paulista"], ["Camaragibe", "Cabo de Santo Agostinho", "Caruaru"]),
+  estado("PI", "86", "Teresina e região", "State of Piaui", "Teresina",
+    ["Parnaíba"], [["Picos", "89"], "Altos", "José de Freitas", "Campo Maior"]),
+  estado("RJ", "21", "Rio de Janeiro e região", "State of Rio de Janeiro", "Rio de Janeiro",
+    ["Niterói", "São Gonçalo", "Duque de Caxias", "Nova Iguaçu"], ["Belford Roxo", "São João de Meriti", ["Petrópolis", "24"]]),
+  estado("RN", "84", "Natal e região", "State of Rio Grande do Norte", "Natal",
+    ["Parnamirim", "Mossoró"], ["São Gonçalo do Amarante", "Macaíba", "Extremoz"]),
+  estado("RS", "51", "Porto Alegre e região", "State of Rio Grande do Sul", "Porto Alegre",
+    ["Canoas", "Gravataí", "Novo Hamburgo"], ["São Leopoldo", "Viamão", "Alvorada", ["Caxias do Sul", "54"]]),
+  estado("RO", "69", "Porto Velho e região", "State of Rondonia", "Porto Velho",
+    ["Ji-Paraná", "Ariquemes"], ["Vilhena", "Cacoal", "Jaru"]),
+  estado("RR", "95", "Boa Vista e região", "State of Roraima", "Boa Vista",
+    ["Rorainópolis"], ["Caracaraí", "Alto Alegre", "Mucajaí"]),
+  estado("SE", "79", "Aracaju e região", "State of Sergipe", "Aracaju",
+    ["Nossa Senhora do Socorro", "São Cristóvão"], ["Barra dos Coqueiros", "Itabaiana", "Lagarto"]),
+  estado("TO", "63", "Palmas e região", "State of Tocantins", "Palmas",
+    ["Araguaína", "Gurupi"], ["Porto Nacional", "Paraíso do Tocantins", "Miracema do Tocantins"]),
+);
 
 const nichos = [
   ["Desentupidora", ["{termo}", "{termo} 24 horas", "{termo} perto de mim", "{termo} mais próxima", "desentupimento", "desentupir esgoto", "desentupidora de vaso"]],
@@ -163,8 +228,8 @@ let sql = `-- Robô de Prospecção — dados iniciais (apêndice A, seção 6, 
 regioes.forEach((r, i) => {
   sql += `insert into regions (nome, uf, ddd, descricao, ordem) values (${q(r.nome)}, ${q(r.uf)}, ${q(r.ddd)}, ${q(r.descricao)}, ${i})
   on conflict (nome) do update set uf = excluded.uf, ddd = excluded.ddd, descricao = excluded.descricao, ordem = excluded.ordem;\n`;
-  const valores = r.pontos.map(([n, c, t, cam, v]) =>
-    `  (${q(n)}, ${q(c)}, ${q(t)}, ${q(cam)}, ${q(r.ddd)}, ${v ? "now()" : "null::timestamptz"})`).join(",\n");
+  const valores = r.pontos.map(([n, c, t, cam, v, d]) =>
+    `  (${q(n)}, ${q(c)}, ${q(t)}, ${q(cam)}, ${q(d ?? r.ddd)}, ${v ? "now()" : "null::timestamptz"})`).join(",\n");
   sql += `insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 select r.id, v.* from regions r, (values
 ${valores}

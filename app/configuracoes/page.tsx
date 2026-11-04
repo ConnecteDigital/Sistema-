@@ -24,7 +24,7 @@ export default async function Configuracoes() {
   const [chaves, equipe, regioes, locais, nichos] = await Promise.all([
     db().from("serp_keys").select("*").order("id"),
     db().from("equipe").select("id, nome").eq("ativo", true).order("nome"),
-    db().from("regions").select("id, nome, ddd").order("ordem"),
+    db().from("regions").select("id, nome, ddd, uf").order("uf").order("ordem"),
     db().from("locations").select("region_id, camada, validado_em").eq("ativo", true),
     db().from("niches").select("nome, keyword_templates(modelo, ordem)").order("ordem"),
   ]);
@@ -140,11 +140,15 @@ export default async function Configuracoes() {
       {/* Catálogo */}
       <section className="cartao space-y-3 p-4 sm:p-5">
         <h2 className="font-semibold">Regiões e pontos</h2>
+        <p className="text-sm text-suave">
+          {(regioes.data ?? []).length} regiões em {new Set((regioes.data ?? []).map((r) => r.uf)).size} estados ·{" "}
+          {(locais.data ?? []).length} pontos ativos. Mínima = capital/polo; Média = + cidades grandes; Ampla = tudo.
+        </p>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[520px] text-sm">
             <thead className="text-left text-xs uppercase text-suave">
               <tr className="border-b border-borda">
-                <th className="py-2 pr-3">Região</th><th className="pr-3">DDD</th>
+                <th className="py-2 pr-3">UF</th><th className="pr-3">Região</th><th className="pr-3">DDD</th>
                 <th className="pr-3 text-right">Mínima</th><th className="pr-3 text-right">Média</th>
                 <th className="pr-3 text-right">Ampla</th><th className="text-right">Não validados</th>
               </tr>
@@ -156,7 +160,8 @@ export default async function Configuracoes() {
                 const pend = ls.filter((l) => !l.validado_em).length;
                 return (
                   <tr key={r.id} className="border-b border-borda last:border-0">
-                    <td className="py-2 pr-3 font-medium">{r.nome}</td>
+                    <td className="py-2 pr-3 text-suave">{r.uf}</td>
+                    <td className="pr-3 font-medium">{r.nome}</td>
                     <td className="pr-3">{r.ddd}</td>
                     <td className="pr-3 text-right tabular-nums">{n(["minima"])}</td>
                     <td className="pr-3 text-right tabular-nums">{n(["minima", "media"])}</td>
