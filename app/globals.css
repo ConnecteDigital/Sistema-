@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+@theme {
+  --color-fundo: #f8fafc;
+  --color-cartao: #ffffff;
+  --color-borda: #e2e8f0;
+  --color-texto: #0f172a;
+  --color-suave: #64748b;
+  --color-marca: #1a73e8;
+  --color-marca-escura: #1557b0;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+body {
+  background: var(--color-fundo);
+  color: var(--color-texto);
+}
+
+@layer components {
+  .campo {
+    @apply rounded-lg border border-borda bg-white px-3 py-2 text-sm outline-none focus:border-marca focus:ring-2 focus:ring-marca/20;
+  }
+  .botao {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-marca px-4 py-2 text-sm font-medium text-white hover:bg-marca-escura disabled:opacity-50;
+  }
+  .botao-sec {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-borda bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50;
+  }
+  .cartao {
+    @apply rounded-xl border border-borda bg-cartao;
+  }
+  .selo {
+    @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium;
+  }
+}

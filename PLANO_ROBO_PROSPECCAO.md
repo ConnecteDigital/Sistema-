@@ -367,16 +367,17 @@ Mesmo formato das planilhas que já usamos:
 ## 16. Variáveis de ambiente *[rev. 1]*
 
 ```
-NEXT_PUBLIC_SUPABASE_URL=
-SUPABASE_SERVICE_ROLE_KEY=       # só no servidor
+SUPABASE_URL=                    # https://<projeto>.supabase.co
+SUPABASE_SECRET_KEY=             # sb_secret_... — só no servidor
 KEYS_ENCRYPTION_SECRET=          # para criptografar as chaves SerpApi no banco
+ACESSO_CODIGO=                   # opcional: vazio = abre direto; preenchido = pede o código 1x por navegador
 DATAFORSEO_LOGIN=                # opcional
 DATAFORSEO_PASSWORD=             # opcional
 ANTHROPIC_API_KEY=               # opcional (modo comando)
 CRON_SECRET=                     # proteger as rotas chamadas pelo Cron
 ```
 
-(`NEXT_PUBLIC_SUPABASE_ANON_KEY` deixou de ser necessária: o navegador não acessa o Supabase direto.)
+A chave pública (`sb_publishable_...`) e a URL de JWKS do Supabase **não são usadas**: o navegador não acessa o Supabase direto e não há login.
 
 **Segurança:** as chaves da SerpApi, DataForSEO, Serper e Apify usadas nos testes apareceram numa conversa. **Gerar chaves novas** em todos os serviços antes de cadastrar no sistema.
 
