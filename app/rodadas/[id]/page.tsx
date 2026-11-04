@@ -17,23 +17,42 @@ export default async function Rodada({ params }: { params: Promise<{ id: string 
   const [prog, anunc, buscas] = await Promise.all([
     progresso(id),
     db().from("run_advertisers")
-      .select("id, aparicoes, buscas, presenca, pontos, termos, pos_media, pct_topo, pct_sitelinks, titulo, link, forca, nome, duplicado_mesma_busca, advertisers(dominio, nome), regions(nome)")
+      .select("id, advertiser_id, aparicoes, buscas, presenca, pontos, termos, pos_media, pct_topo, pct_sitelinks, titulo, link, forca, nome, duplicado_mesma_busca, advertisers(dominio, nome), regions(nome)")
       .eq("run_id", id).limit(5000),
     db().from("run_searches")
       .select("id, termo, status, qtd_anuncios, erro, location_usada, locations(nome_exibicao, regions(nome))")
       .eq("run_id", id).order("id").limit(5000),
   ]);
 
-  type A = { id: number; aparicoes: number; buscas: number; presenca: number; pontos: string[]; termos: string[];
+  type A = { id: number; advertiser_id: number; aparicoes: number; buscas: number; presenca: number; pontos: string[]; termos: string[];
     pos_media: number | null; pct_topo: number; pct_sitelinks: number; titulo: string | null; link: string | null;
     forca: string; nome: string | null; duplicado_mesma_busca: number;
     advertisers: { dominio: string; nome: string | null }; regions: { nome: string } };
-  const linhas: Linha[] = ((anunc.data ?? []) as unknown as A[]).map((a) => ({
+  const listaA = (anunc.data ?? []) as unknown as A[];
+  const advIds = [...new Set(listaA.map((a) => a.advertiser_id))];
+  const [leads, sites, cnpjs] = advIds.length ? await Promise.all([
+    db().from("leads").select("id, advertiser_id, prioridade, telefone_principal, outros_telefones, observacoes").in("advertiser_id", advIds),
+    db().from("site_checks_recentes").select("advertiser_id, situacao, tag_google").in("advertiser_id", advIds),
+    db().from("consultas_cnpj").select("advertiser_id, resultado, consultado_em").in("advertiser_id", advIds),
+  ]) : [{ data: [] }, { data: [] }, { data: [] }];
+  const leadPor = new Map((leads.data ?? []).map((l) => [l.advertiser_id, l]));
+  const sitePor = new Map((sites.data ?? []).map((c) => [c.advertiser_id, c]));
+  const cnpjPor = new Map((cnpjs.data ?? []).map((c) => [c.advertiser_id, c]));
+
+  const linhas: Linha[] = listaA.map((a) => ({
     id: a.id, regiao: a.regions.nome, dominio: a.advertisers.dominio, nome: a.nome ?? a.advertisers.nome,
     aparicoes: a.aparicoes, buscas: a.buscas, presenca: Number(a.presenca), pontos: a.pontos, termos: a.termos,
     pos_media: a.pos_media === null ? null : Number(a.pos_media), pct_topo: Number(a.pct_topo),
     pct_sitelinks: Number(a.pct_sitelinks), titulo: a.titulo, link: a.link, forca: a.forca, duplicado: a.duplicado_mesma_busca,
+    advertiserId: a.advertiser_id, leadId: leadPor.get(a.advertiser_id)?.id ?? null,
+    prioridade: leadPor.get(a.advertiser_id)?.prioridade ?? null,
+    telefone: leadPor.get(a.advertiser_id)?.telefone_principal ?? null,
+    outrosTelefones: leadPor.get(a.advertiser_id)?.outros_telefones ?? [],
+    observacoes: prog.status === "pronta" ? (leadPor.get(a.advertiser_id)?.observacoes ?? []) : [],
+    situacao: sitePor.get(a.advertiser_id)?.situacao ?? null, tagGoogle: sitePor.get(a.advertiser_id)?.tag_google ?? null,
+    cnpj: cnpjPor.get(a.advertiser_id) ? { resultado: cnpjPor.get(a.advertiser_id)!.resultado, consultado_em: cnpjPor.get(a.advertiser_id)!.consultado_em } : null,
   }));
+  const semLeads = prog.status === "pronta" && linhas.length > 0 && linhas.every((l) => !l.prioridade);
 
   type B = { id: number; termo: string; status: string; qtd_anuncios: number | null; erro: string | null;
     location_usada: string | null; locations: { nome_exibicao: string; regions: { nome: string } } };
@@ -51,7 +70,7 @@ export default async function Rodada({ params }: { params: Promise<{ id: string 
         </p>
       </div>
 
-      <Executor runId={id} inicial={prog} />
+      <Executor runId={id} inicial={prog} semLeads={semLeads} />
 
       {linhas.length > 0 ? (
         <TabelaAnunciantes linhas={linhas} />

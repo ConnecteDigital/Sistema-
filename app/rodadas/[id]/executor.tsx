@@ -3,10 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-type Progresso = { status: string; total: number; feitas: number; erros: number; anunciantes: number; erro: string | null; terminou: boolean };
+type Progresso = {
+  status: string; total: number; feitas: number; erros: number; anunciantes: number; erro: string | null; terminou: boolean;
+  sitesTotal: number; sitesVerificados: number;
+};
 
 /** Chama /work em sequência até a rodada terminar, atualizando a tela a cada lote. */
-export function Executor({ runId, inicial }: { runId: number; inicial: Progresso }) {
+export function Executor({ runId, inicial, semLeads }: { runId: number; inicial: Progresso; semLeads: boolean }) {
   const router = useRouter();
   const [p, setP] = useState(inicial);
   const [falha, setFalha] = useState<string | null>(null);
@@ -46,15 +49,34 @@ export function Executor({ runId, inicial }: { runId: number; inicial: Progresso
     setRodando(true);
   }
 
-  if (p.terminou && !rodando) return null;
-  const pct = p.total ? Math.round(((p.feitas + p.erros) / p.total) * 100) : 0;
+  async function verificarSites() {
+    await fetch(`/api/runs/${runId}/reprocessar`, { method: "POST" });
+    setP((x) => ({ ...x, status: "verificando", terminou: false, erro: null }));
+    setRodando(true);
+  }
+
+  if (p.terminou && !rodando) {
+    if (!semLeads) return null;
+    return (
+      <div className="cartao flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
+        <span>Esta rodada foi feita antes da verificação de sites. Quer verificar os sites e gerar os leads agora? (grátis)</span>
+        <button onClick={verificarSites} className="botao">Verificar sites</button>
+      </div>
+    );
+  }
+  const verificando = p.status === "verificando";
+  const pct = verificando
+    ? (p.sitesTotal ? Math.round((p.sitesVerificados / p.sitesTotal) * 100) : 0)
+    : (p.total ? Math.round(((p.feitas + p.erros) / p.total) * 100) : 0);
   return (
     <div className="cartao space-y-3 p-4">
       <div className="flex items-center justify-between text-sm">
         <span className="font-medium">
-          {rodando ? "Buscando anúncios…" : p.erro ? "Parada" : "Pausada"}
+          {rodando ? (verificando ? "Verificando os sites dos anunciantes…" : "Buscando anúncios…") : p.erro ? "Parada" : "Pausada"}
         </span>
-        <span className="tabular-nums text-suave">{p.feitas + p.erros} / {p.total} buscas · {pct}%</span>
+        <span className="tabular-nums text-suave">
+          {verificando ? `${p.sitesVerificados} / ${p.sitesTotal || "?"} sites` : `${p.feitas + p.erros} / ${p.total} buscas`} · {pct}%
+        </span>
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-slate-100">
         <div className="h-full bg-marca transition-all" style={{ width: `${pct}%` }} />

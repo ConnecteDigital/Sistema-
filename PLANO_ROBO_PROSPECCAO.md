@@ -251,6 +251,15 @@ Observações geradas automaticamente (texto pronto para o prospectador):
 
 ---
 
+## 10.1 Consultar CNPJ (botão, sob demanda) *[rev. 3]*
+
+Ao lado de cada anunciante, botão **"Consultar CNPJ"**. Só roda quando clicado (grátis) e guarda o resultado (`consultas_cnpj`):
+1. **Registro.br (RDAP)** — `https://rdap.registro.br/domain/<dominio>`: titular do domínio `.br`. Traz o CNPJ quando o dono é empresa; quando é pessoa física, mostra só o nome (CPF fica oculto).
+2. **O próprio site** — página do anúncio, home e `/contato`, `/politica-de-privacidade`, `/sobre`, `/quem-somos`: procura CNPJ escrito (com validação dos dígitos).
+3. **Dados da Receita** — BrasilAPI (`/api/cnpj/v1/<cnpj>`), com `publica.cnpj.ws` como reserva: razão social, nome fantasia, situação, abertura, atividade, endereço, telefones, e-mail e **sócios**.
+
+A verificação automática de site (seção 9) também guarda os CNPJs achados no HTML (`site_checks.cnpjs`).
+
 ## 11. DataForSEO — usos de apoio (opcionais)
 
 Autenticação Basic (login:senha da API). Endpoints testados:

@@ -4,6 +4,9 @@ import { descriptografar } from "./crypto";
 import { buscarAnuncios, consultarConta } from "./serpapi";
 import { identificarAnunciante } from "./dominio";
 import { agregar, type AdBruto, type BuscaOk, type Limites } from "./agregacao";
+import { analisarPagina, baixarPagina } from "./site";
+import { dominioRaiz, hostDe } from "./dominio";
+import { avaliarLead, montarContexto, type PresencaRegiao, type SiteResumo } from "./regras";
 
 // ---------------------------------------------------------------------------
 // Configurações
@@ -14,6 +17,7 @@ export async function lerSettings() {
   return {
     limites: (m.get("forca_limites") as Limites) ?? { fraca_ate: 0.4, forte_acima: 0.75 },
     paralelo: Math.max(1, Math.min(10, Number(m.get("buscas_em_paralelo") ?? 6))),
+    reverificarDias: Math.max(0, Number(m.get("reverificar_site_dias") ?? 7)),
   };
 }
 
@@ -96,14 +100,14 @@ export async function criarRodada(termos: string[], locationIds: number[]) {
 // ---------------------------------------------------------------------------
 export type Progresso = {
   status: string; total: number; feitas: number; erros: number; anunciantes: number; erro: string | null;
-  terminou: boolean;
+  terminou: boolean; sitesTotal: number; sitesVerificados: number;
 };
 
 export async function progresso(runId: number): Promise<Progresso> {
   const contar = (status: string) => db().from("run_searches").select("id", { count: "exact", head: true })
     .eq("run_id", runId).eq("status", status);
   const [run, ok, erro, anunc] = await Promise.all([
-    db().from("runs").select("status, total_buscas, erro").eq("id", runId).single(),
+    db().from("runs").select("status, total_buscas, erro, sites_total, sites_verificados").eq("id", runId).single(),
     contar("ok"), contar("erro"),
     db().from("run_advertisers").select("id", { count: "exact", head: true }).eq("run_id", runId),
   ]);
@@ -113,7 +117,7 @@ export async function progresso(runId: number): Promise<Progresso> {
       status: "desconhecido", total: 0, feitas: ok.count ?? 0, erros: erro.count ?? 0, anunciantes: 0,
       erro: "Erro ao ler a rodada no banco: " + (run.error?.message ?? "não encontrada") +
         ". Se falar de coluna/função que não existe, rode o 0003_motor.sql no Supabase.",
-      terminou: false,
+      terminou: false, sitesTotal: 0, sitesVerificados: 0,
     };
   }
   const status = run.data.status;
@@ -121,6 +125,7 @@ export async function progresso(runId: number): Promise<Progresso> {
     status, total: run.data.total_buscas ?? 0, feitas: ok.count ?? 0, erros: erro.count ?? 0,
     anunciantes: anunc.count ?? 0, erro: run.data.erro ?? null,
     terminou: status === "pronta" || status === "erro",
+    sitesTotal: run.data.sites_total ?? 0, sitesVerificados: run.data.sites_verificados ?? 0,
   };
 }
 
@@ -128,6 +133,10 @@ export async function processarLote(runId: number): Promise<Progresso> {
   const { data: run } = await db().from("runs").select("status, erro").eq("id", runId).single();
   if (!run) throw new Error("Rodada não encontrada.");
   if (run.status === "pronta" || run.status === "erro") return progresso(runId);
+  if (run.status === "verificando") {
+    await verificarSitesLote(runId);
+    return progresso(runId);
+  }
 
   const { paralelo } = await lerSettings();
   const pool = await carregarChaves();
@@ -283,10 +292,135 @@ async function finalizar(runId: number) {
     if (error) throw new Error(error.message);
   }
 
+  // Próxima etapa: verificar os sites (Fase 3)
   await db().from("runs").update({
-    status: "pronta", buscas_ok: buscas.length, creditos_usados: buscas.length, finalizada_em: agora, erro: null,
+    status: "verificando", buscas_ok: buscas.length, creditos_usados: buscas.length, erro: null,
   }).eq("id", runId);
 
   // Saldo real das chaves (grátis)
   await atualizarCreditosAtivos().catch(() => {});
+}
+
+// ---------------------------------------------------------------------------
+// Fase 3: verificação de sites e geração de leads
+// ---------------------------------------------------------------------------
+type AnuncianteRodada = { advertiser_id: number; presenca: number; link: string | null; advertisers: { dominio: string } };
+
+async function anunciantesDaRodada(runId: number) {
+  const linhas = await todas<AnuncianteRodada>((de, ate) => db().from("run_advertisers")
+    .select("advertiser_id, presenca, link, advertisers(dominio)").eq("run_id", runId).order("id").range(de, ate) as never);
+  // um link por anunciante: o da região onde ele é mais forte
+  const porId = new Map<number, { dominio: string; link: string | null; presenca: number }>();
+  for (const l of linhas) {
+    const atual = porId.get(l.advertiser_id);
+    if (!atual || Number(l.presenca) > atual.presenca) {
+      porId.set(l.advertiser_id, { dominio: l.advertisers.dominio, link: l.link, presenca: Number(l.presenca) });
+    }
+  }
+  return porId;
+}
+
+function urlParaVerificar(dominio: string, link: string | null) {
+  const host = hostDe(link);
+  if (link && host && dominioRaiz(host) === dominio) return link;
+  return `https://${dominio}/`;
+}
+
+export async function verificarSite(advertiserId: number, dominio: string, url: string) {
+  const pagina = await baixarPagina(url);
+  const a = analisarPagina(pagina);
+  await db().from("site_checks").insert({
+    advertiser_id: advertiserId, url, http_status: pagina.status, url_final: pagina.urlFinal,
+    situacao: a.situacao, motivo: a.motivo, telefones: a.telefones.map((t) => t.formatado),
+    whatsapps: a.whatsapps.map((t) => t.formatado), tags_aw: a.tagsAw, tags_gtm: a.tagsGtm, ga4: a.ga4,
+    tamanho_html: pagina.html.length, tempo_ms: pagina.tempoMs, cnpjs: a.cnpjs, tag_google: a.tagGoogle, via: "proprio",
+  });
+}
+
+async function verificarSitesLote(runId: number) {
+  const { reverificarDias } = await lerSettings();
+  const anunciantes = await anunciantesDaRodada(runId);
+  const ids = [...anunciantes.keys()];
+  const limite = Date.now() - reverificarDias * 86_400_000;
+
+  const recentes = new Map<number, string>();
+  for (let i = 0; i < ids.length; i += 300) {
+    const { data, error } = await db().from("site_checks_recentes").select("advertiser_id, verificado_em")
+      .in("advertiser_id", ids.slice(i, i + 300));
+    if (error) throw new Error(error.message);
+    for (const c of data ?? []) recentes.set(c.advertiser_id, c.verificado_em);
+  }
+  const verificaveis = ids.filter((id) => !anunciantes.get(id)!.dominio.startsWith("perfil-google:"));
+  const pendentes = verificaveis.filter((id) => !recentes.has(id) || new Date(recentes.get(id)!).getTime() < limite);
+
+  const LOTE = 8;
+  await Promise.all(pendentes.slice(0, LOTE).map((id) => {
+    const a = anunciantes.get(id)!;
+    return verificarSite(id, a.dominio, urlParaVerificar(a.dominio, a.link)).catch(() => {});
+  }));
+
+  const restantes = Math.max(0, pendentes.length - LOTE);
+  await db().from("runs").update({
+    sites_total: verificaveis.length, sites_verificados: verificaveis.length - restantes,
+  }).eq("id", runId);
+  if (restantes === 0) {
+    await gerarLeads(runId);
+    await db().from("runs").update({ status: "pronta", finalizada_em: new Date().toISOString() }).eq("id", runId);
+  }
+}
+
+type LinhaSite = {
+  advertiser_id: number; situacao: string; motivo: string | null; telefones: string[]; whatsapps: string[];
+  tag_google: string | null; tags_aw: string[]; tags_gtm: string[]; advertisers: { dominio: string };
+};
+const resumoSite = (c: LinhaSite): SiteResumo => ({
+  situacao: c.situacao, motivo: c.motivo, telefones: c.telefones ?? [], whatsapps: c.whatsapps ?? [],
+  tagGoogle: c.tag_google, tagsAw: c.tags_aw ?? [], tagsGtm: c.tags_gtm ?? [],
+});
+
+export async function gerarLeads(runId: number) {
+  type L = { advertiser_id: number; presenca: number; forca: string; pct_sitelinks: number; duplicado_mesma_busca: number;
+    advertisers: { dominio: string }; regions: { nome: string; ddd: string } };
+  const linhas = await todas<L>((de, ate) => db().from("run_advertisers")
+    .select("advertiser_id, presenca, forca, pct_sitelinks, duplicado_mesma_busca, advertisers(dominio), regions(nome, ddd)")
+    .eq("run_id", runId).order("id").range(de, ate) as never);
+
+  // Contexto global: últimas verificações dos últimos 90 dias (para achar redes e mesmo dono)
+  const desde = new Date(Date.now() - 90 * 86_400_000).toISOString();
+  const sites = await todas<LinhaSite>((de, ate) => db().from("site_checks_recentes")
+    .select("advertiser_id, situacao, motivo, telefones, whatsapps, tag_google, tags_aw, tags_gtm, advertisers(dominio)")
+    .gte("verificado_em", desde).order("advertiser_id").range(de, ate) as never);
+  const sitePorId = new Map(sites.map((c) => [c.advertiser_id, c]));
+  const ctx = montarContexto(sites.map((c) => ({ dominio: c.advertisers.dominio, site: resumoSite(c) })));
+
+  const grupos = new Map<number, { dominio: string; regioes: PresencaRegiao[] }>();
+  for (const l of linhas) {
+    if (!grupos.has(l.advertiser_id)) grupos.set(l.advertiser_id, { dominio: l.advertisers.dominio, regioes: [] });
+    grupos.get(l.advertiser_id)!.regioes.push({
+      regiao: l.regions.nome, ddd: l.regions.ddd, presenca: Number(l.presenca), forca: l.forca,
+      pctSitelinks: Number(l.pct_sitelinks), duplicado: l.duplicado_mesma_busca,
+    });
+  }
+
+  const agora = new Date().toISOString();
+  const leads = [...grupos].map(([advertiserId, g]) => {
+    const c = sitePorId.get(advertiserId);
+    const r = avaliarLead({ dominio: g.dominio, regioes: g.regioes, site: c ? resumoSite(c) : null }, ctx);
+    return {
+      advertiser_id: advertiserId, prioridade: r.prioridade, telefone_principal: r.telefonePrincipal,
+      outros_telefones: r.outrosTelefones, observacoes: r.observacoes, forca: r.forca,
+      presenca: Number(r.presenca.toFixed(4)), regioes: g.regioes.map((x) => x.regiao), ultima_rodada: runId,
+      atualizado_em: agora,
+    };
+  });
+  // upsert só dos campos automáticos: status, responsável, notas e data do contato ficam como estão
+  for (let i = 0; i < leads.length; i += 500) {
+    const { error } = await db().from("leads").upsert(leads.slice(i, i + 500), { onConflict: "advertiser_id" });
+    if (error) throw new Error(error.message);
+  }
+}
+
+/** Refaz a verificação de sites e os leads de uma rodada (ex.: rodadas feitas antes da Fase 3). */
+export async function reprocessar(runId: number) {
+  await db().from("runs").update({ status: "verificando", erro: null, finalizada_em: null }).eq("id", runId);
 }
