@@ -37,3 +37,43 @@ export async function buscarLocais(texto: string, limite = 10): Promise<LocalSer
   const j = (await r.json()) as LocalSerpApi[];
   return j.filter((l) => l.country_code === "BR");
 }
+
+export type AnuncioSerpApi = {
+  position?: number; block_position?: string; title?: string; link?: string; displayed_link?: string;
+  source?: string; sitelinks?: unknown; extensions?: unknown; rating?: number; reviews?: number;
+  tracking_link?: string;
+};
+
+export type ResultadoBusca =
+  | { tipo: "ok"; anuncios: AnuncioSerpApi[]; localUsado: string | null }
+  | { tipo: "sem_creditos"; msg: string }
+  | { tipo: "erro"; msg: string };
+
+/** Uma busca de anúncios ao vivo (engine google_ads, celular). Gasta 1 crédito (exceto cache de 1h). */
+export async function buscarAnuncios(apiKey: string, termo: string, location: string): Promise<ResultadoBusca> {
+  const p = new URLSearchParams({
+    engine: "google_ads", q: termo, location, google_domain: "google.com.br",
+    gl: "br", hl: "pt-br", device: "mobile", api_key: apiKey,
+  });
+  let r: Response;
+  try {
+    r = await fetch(`${BASE}/search.json?${p}`, { cache: "no-store", signal: AbortSignal.timeout(25_000) });
+  } catch (e) {
+    return { tipo: "erro", msg: "Falha de rede: " + (e instanceof Error ? e.message : String(e)) };
+  }
+  const j = await r.json().catch(() => ({} as Record<string, unknown>));
+  const erro = typeof j.error === "string" ? j.error : null;
+  const localUsado = (j.search_parameters as { location_used?: string } | undefined)?.location_used ?? null;
+
+  if (erro) {
+    // Sem anúncios/resultados não é erro: é uma busca válida com 0 anúncios
+    if (/hasn't returned any results|no results/i.test(erro)) return { tipo: "ok", anuncios: [], localUsado };
+    if (r.status === 429 || /run out of searches|searches? (left|remaining)|plan.*limit|exceeded|rate limit/i.test(erro)) {
+      return { tipo: "sem_creditos", msg: erro };
+    }
+    if (r.status === 401 || /invalid api key/i.test(erro)) return { tipo: "sem_creditos", msg: erro };
+    return { tipo: "erro", msg: erro };
+  }
+  if (!r.ok) return { tipo: "erro", msg: `SerpApi HTTP ${r.status}` };
+  return { tipo: "ok", anuncios: Array.isArray(j.ads) ? (j.ads as AnuncioSerpApi[]) : [], localUsado };
+}

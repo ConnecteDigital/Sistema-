@@ -140,3 +140,28 @@ export async function validarLocais(_: Resultado): Promise<Resultado> {
       (faltam ? ` Faltam ${faltam}: clique de novo.` : ""),
   };
 }
+
+export async function adicionarVariacao(form: FormData): Promise<void> {
+  const nicheId = Number(form.get("niche_id"));
+  const modelo = String(form.get("modelo") ?? "").trim().toLowerCase();
+  if (!nicheId || !modelo) return;
+  const { count } = await db().from("keyword_templates").select("id", { count: "exact", head: true }).eq("niche_id", nicheId);
+  await db().from("keyword_templates").upsert({ niche_id: nicheId, modelo, ordem: count ?? 0 }, { onConflict: "niche_id,modelo" });
+  revalidatePath("/configuracoes");
+  revalidatePath("/");
+}
+
+export async function removerVariacao(form: FormData): Promise<void> {
+  await db().from("keyword_templates").delete().eq("id", Number(form.get("id")));
+  revalidatePath("/configuracoes");
+  revalidatePath("/");
+}
+
+export async function adicionarNicho(form: FormData): Promise<void> {
+  const nome = String(form.get("nome") ?? "").trim();
+  if (!nome) return;
+  const { data } = await db().from("niches").upsert({ nome, ordem: 99 }, { onConflict: "nome" }).select("id").single();
+  if (data) await db().from("keyword_templates").upsert({ niche_id: data.id, modelo: "{termo}", ordem: 0 }, { onConflict: "niche_id,modelo" });
+  revalidatePath("/configuracoes");
+  revalidatePath("/");
+}

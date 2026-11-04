@@ -4,7 +4,7 @@ import { formatarData } from "@/lib/utils";
 import { AvisoConfiguracao } from "@/components/aviso-configuracao";
 import { BotaoEnviar, BotaoValidarLocais, FormNovaChave } from "./formularios";
 import {
-  adicionarPessoa, alternarChave, atualizarTodosCreditos, excluirChave, removerPessoa, salvarLimiteTroca,
+  adicionarNicho, adicionarPessoa, adicionarVariacao, alternarChave, removerVariacao, atualizarTodosCreditos, excluirChave, removerPessoa, salvarLimiteTroca,
 } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -26,7 +26,7 @@ export default async function Configuracoes() {
     db().from("equipe").select("id, nome").eq("ativo", true).order("nome"),
     db().from("regions").select("id, nome, ddd, uf").order("uf").order("ordem"),
     db().from("locations").select("region_id, camada, validado_em").eq("ativo", true),
-    db().from("niches").select("nome, keyword_templates(modelo, ordem)").order("ordem"),
+    db().from("niches").select("id, nome, keyword_templates(id, modelo, ordem)").order("ordem"),
   ]);
   const erroBanco = chaves.error ?? equipe.error ?? regioes.error;
   if (erroBanco) {
@@ -181,17 +181,34 @@ export default async function Configuracoes() {
         <h2 className="font-semibold">Variações por nicho</h2>
         <div className="grid gap-3 sm:grid-cols-2">
           {(nichos.data ?? []).map((n) => (
-            <div key={n.nome}>
+            <div key={n.id} className="space-y-1.5">
               <p className="text-sm font-medium">{n.nome}</p>
-              <div className="mt-1 flex flex-wrap gap-1">
-                {[...(n.keyword_templates as { modelo: string; ordem: number }[])]
+              <div className="flex flex-wrap gap-1">
+                {[...(n.keyword_templates as { id: number; modelo: string; ordem: number }[])]
                   .sort((a, b) => a.ordem - b.ordem)
-                  .map((t) => <span key={t.modelo} className="selo bg-blue-50 text-blue-800">{t.modelo}</span>)}
+                  .map((t) => (
+                    <form key={t.id} action={removerVariacao} className="selo gap-1 bg-blue-50 text-blue-800">
+                      <input type="hidden" name="id" value={t.id} />
+                      {t.modelo}
+                      <button className="text-blue-400 hover:text-red-600" aria-label={`Remover ${t.modelo}`}>×</button>
+                    </form>
+                  ))}
               </div>
+              <form action={adicionarVariacao} className="flex gap-1">
+                <input type="hidden" name="niche_id" value={n.id} />
+                <input name="modelo" placeholder="nova variação, ex.: {termo} barato" className="campo flex-1 py-1 text-xs" />
+                <button className="botao-sec py-1 text-xs">+</button>
+              </form>
             </div>
           ))}
         </div>
-        <p className="text-xs text-suave">A edição das variações entra junto com a tela de pesquisa (Fase 2).</p>
+        <form action={adicionarNicho} className="flex gap-2 border-t border-borda pt-3">
+          <input name="nome" placeholder="Novo nicho (ex.: Dedetização)" className="campo w-full sm:w-64" />
+          <BotaoEnviar>Adicionar nicho</BotaoEnviar>
+        </form>
+        <p className="text-xs text-suave">
+          <code>{"{termo}"}</code> é trocado pelo que você digita na pesquisa. Ex.: <code>{"{termo} 24 horas"}</code> → &quot;encanador 24 horas&quot;.
+        </p>
       </section>
     </main>
   );

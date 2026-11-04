@@ -1,43 +1,48 @@
-import Link from "next/link";
 import { db } from "@/lib/supabase";
 import { variaveisFaltando } from "@/lib/env";
 import { AvisoConfiguracao } from "@/components/aviso-configuracao";
+import { FormPesquisa, type Dados } from "./form-pesquisa";
 
 export const dynamic = "force-dynamic";
 
-async function creditosDisponiveis(): Promise<number | null> {
-  if (variaveisFaltando().length) return null;
-  const { data, error } = await db().from("serp_keys").select("creditos_restantes").eq("ativa", true);
-  if (error) return null;
-  return (data ?? []).reduce((s, k) => s + (k.creditos_restantes ?? 0), 0);
-}
-
 export default async function NovaPesquisa() {
-  const creditos = await creditosDisponiveis();
+  if (variaveisFaltando().length) {
+    return <main className="mx-auto max-w-3xl p-4"><AvisoConfiguracao /></main>;
+  }
+  const [nichos, regioes, locais, chaves] = await Promise.all([
+    db().from("niches").select("id, nome, keyword_templates(modelo, ordem)").order("ordem"),
+    db().from("regions").select("id, nome, uf, ddd").order("uf").order("ordem"),
+    db().from("locations").select("id, region_id, nome_exibicao, camada")
+      .eq("ativo", true).not("validado_em", "is", null).order("id"),
+    db().from("serp_keys").select("creditos_restantes, limite_troca").eq("ativa", true),
+  ]);
+  const erro = nichos.error ?? regioes.error ?? locais.error ?? chaves.error;
+  if (erro) {
+    return (
+      <main className="mx-auto max-w-3xl p-4">
+        <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-900">
+          Não consegui ler o banco: {erro.message}
+        </div>
+      </main>
+    );
+  }
+  const dados: Dados = {
+    nichos: (nichos.data ?? []).map((n) => ({
+      nome: n.nome,
+      modelos: [...(n.keyword_templates as { modelo: string; ordem: number }[])]
+        .sort((a, b) => a.ordem - b.ordem).map((t) => t.modelo),
+    })),
+    regioes: regioes.data ?? [],
+    locais: locais.data ?? [],
+    creditos: (chaves.data ?? []).reduce((s, k) => s + Math.max(0, (k.creditos_restantes ?? 0) - (k.limite_troca ?? 2)), 0),
+  };
   return (
-    <main className="mx-auto flex max-w-2xl flex-col items-center px-4 pt-[12vh]">
-      <div className="mb-4 w-full"><AvisoConfiguracao /></div>
-      <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
-        <span className="text-marca">Prospecção</span>
-      </h1>
-      <p className="mt-2 text-sm text-suave">Quem está anunciando agora no Google, no celular.</p>
-
-      <div className="mt-8 w-full">
-        <input
-          disabled
-          placeholder="ex.: desentupidora"
-          className="w-full rounded-full border border-borda bg-white px-6 py-4 text-base shadow-sm outline-none disabled:cursor-not-allowed"
-        />
+    <main className="mx-auto max-w-3xl px-4 pb-16 pt-[6vh]">
+      <div className="mb-8 text-center">
+        <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl"><span className="text-marca">Prospecção</span></h1>
+        <p className="mt-2 text-sm text-suave">Quem está anunciando agora no Google, no celular.</p>
       </div>
-      <p className="mt-3 text-center text-sm text-suave">
-        A pesquisa (variações, área, custo e execução) chega na <strong>Fase 2</strong>.
-      </p>
-
-      <p className="mt-8 text-sm">
-        Créditos SerpApi disponíveis:{" "}
-        <strong>{creditos ?? "—"}</strong>{" · "}
-        <Link href="/configuracoes" className="text-marca hover:underline">gerenciar chaves</Link>
-      </p>
+      <FormPesquisa dados={dados} />
     </main>
   );
 }
