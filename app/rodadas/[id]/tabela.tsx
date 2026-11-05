@@ -4,15 +4,8 @@ import { useMemo, useState } from "react";
 import { ConsultaCnpj, type CnpjSalvo } from "@/components/consulta-cnpj";
 import { COR_FORCA, COR_PRIORIDADE, ROTULO_SITUACAO, ROTULO_TAG, linkWhats } from "@/components/selos";
 
-export type Linha = {
-  id: number; regiao: string; dominio: string; nome: string | null; aparicoes: number; buscas: number;
-  presenca: number; pontos: string[]; termos: string[]; pos_media: number | null; pct_topo: number;
-  pct_sitelinks: number; titulo: string | null; link: string | null; forca: string; duplicado: number;
-  advertiserId: number; leadId: number | null; prioridade: string | null; telefone: string | null;
-  outrosTelefones: string[]; observacoes: string[]; situacao: string | null; tagGoogle: string | null;
-  cnpj: CnpjSalvo; cnpjPrincipal: string | null; razaoSocial: string | null; cnpjs: string[];
-  tags: string[]; statusLead: string | null; grupo: number;
-};
+export type { Linha } from "@/lib/linha";
+import type { Linha } from "@/lib/linha";
 const PESO: Record<string, number> = { "Máxima": 0, Alta: 1, Normal: 2, Baixa: 3 };
 
 const pct = (v: number) => `${Math.round(v * 100)}%`;

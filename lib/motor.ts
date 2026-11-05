@@ -9,6 +9,7 @@ import { dominioRaiz, hostDe } from "./dominio";
 import { avaliarLead, montarContexto, type PresencaRegiao, type SiteResumo } from "./regras";
 import { consultarCnpjDoSite, type ResultadoCnpj } from "./consulta-cnpj";
 import { soDigitos } from "./cnpj";
+import { avaliarTermos } from "./palavra";
 
 // ---------------------------------------------------------------------------
 // Configurações
@@ -337,6 +338,7 @@ export async function verificarSite(advertiserId: number, dominio: string, url: 
     situacao: a.situacao, motivo: a.motivo, telefones: a.telefones.map((t) => t.formatado),
     whatsapps: a.whatsapps.map((t) => t.formatado), tags_aw: a.tagsAw, tags_gtm: a.tagsGtm, ga4: a.ga4,
     tamanho_html: pagina.html.length, tempo_ms: pagina.tempoMs, cnpjs: a.cnpjs, tag_google: a.tagGoogle, via: "proprio",
+    texto: a.texto || null, texto_len: a.texto.length,
   });
 }
 
@@ -348,10 +350,11 @@ async function verificarSitesLote(runId: number) {
 
   const recentes = new Map<number, string>();
   for (let i = 0; i < ids.length; i += 300) {
-    const { data, error } = await db().from("site_checks_recentes").select("advertiser_id, verificado_em")
+    const { data, error } = await db().from("site_checks_recentes").select("advertiser_id, verificado_em, texto_len")
       .in("advertiser_id", ids.slice(i, i + 300));
     if (error) throw new Error(error.message);
-    for (const c of data ?? []) recentes.set(c.advertiser_id, c.verificado_em);
+    // verificação antiga sem o texto do site (feita antes dos relatórios) conta como pendente
+    for (const c of data ?? []) if (c.texto_len !== null) recentes.set(c.advertiser_id, c.verificado_em);
   }
   const verificaveis = ids.filter((id) => !anunciantes.get(id)!.dominio.startsWith("perfil-google:"));
   const pendentes = verificaveis.filter((id) => !recentes.has(id) || new Date(recentes.get(id)!).getTime() < limite);
@@ -430,10 +433,10 @@ const resumoSite = (c: LinhaSite): SiteResumo => ({
 });
 
 export async function gerarLeads(runId: number) {
-  type L = { advertiser_id: number; presenca: number; forca: string; pct_sitelinks: number; duplicado_mesma_busca: number;
-    advertisers: { dominio: string }; regions: { nome: string; ddd: string } };
+  type L = { id: number; advertiser_id: number; presenca: number; forca: string; pct_sitelinks: number; duplicado_mesma_busca: number;
+    termos: string[]; advertisers: { dominio: string }; regions: { nome: string; ddd: string } };
   const linhas = await todas<L>((de, ate) => db().from("run_advertisers")
-    .select("advertiser_id, presenca, forca, pct_sitelinks, duplicado_mesma_busca, advertisers(dominio), regions(nome, ddd)")
+    .select("id, advertiser_id, presenca, forca, pct_sitelinks, duplicado_mesma_busca, termos, advertisers(dominio), regions(nome, ddd)")
     .eq("run_id", runId).order("id").range(de, ate) as never);
 
   // Contexto global: últimas verificações dos últimos 90 dias (para achar redes e mesmo dono)
@@ -457,6 +460,29 @@ export async function gerarLeads(runId: number) {
     consultas.map((c) => ({ dominio: c.advertisers.dominio, cnpjs: cnpjPorId.get(c.advertiser_id)!.cnpjs })),
   );
 
+  // O site fala da palavra que anunciou? (por linha da rodada)
+  const idsRodada = [...new Set(linhas.map((l) => l.advertiser_id))];
+  const textoPorId = new Map<number, string | null>();
+  for (let i = 0; i < idsRodada.length; i += 50) {
+    const { data } = await db().from("site_checks_recentes").select("advertiser_id, situacao, texto")
+      .in("advertiser_id", idsRodada.slice(i, i + 50));
+    for (const c of data ?? []) textoPorId.set(c.advertiser_id, c.situacao === "ok" ? c.texto : null);
+  }
+  const palavraPorId = new Map<number, { algumOk: boolean; ausentes: Set<string>; verificado: boolean }>();
+  const atualizacoes = linhas.map((l) => {
+    const r = avaliarTermos(textoPorId.get(l.advertiser_id) ?? null, l.termos ?? []);
+    const p = palavraPorId.get(l.advertiser_id) ?? { algumOk: false, ausentes: new Set<string>(), verificado: false };
+    if (r.termoNoSite !== null) p.verificado = true;
+    if (r.termoNoSite) p.algumOk = true;
+    r.ausentes.forEach((t) => p.ausentes.add(t));
+    palavraPorId.set(l.advertiser_id, p);
+    return { id: l.id, termo_no_site: r.termoNoSite, termos_ausentes: r.ausentes };
+  });
+  for (let i = 0; i < atualizacoes.length; i += 20) {
+    await Promise.all(atualizacoes.slice(i, i + 20).map((u) =>
+      db().from("run_advertisers").update({ termo_no_site: u.termo_no_site, termos_ausentes: u.termos_ausentes }).eq("id", u.id)));
+  }
+
   const grupos = new Map<number, { dominio: string; regioes: PresencaRegiao[] }>();
   for (const l of linhas) {
     if (!grupos.has(l.advertiser_id)) grupos.set(l.advertiser_id, { dominio: l.advertisers.dominio, regioes: [] });
@@ -470,7 +496,10 @@ export async function gerarLeads(runId: number) {
   const leads = [...grupos].map(([advertiserId, g]) => {
     const c = sitePorId.get(advertiserId);
     const cj = cnpjPorId.get(advertiserId);
-    const r = avaliarLead({ dominio: g.dominio, regioes: g.regioes, site: c ? resumoSite(c) : null, cnpjs: cj?.cnpjs, razaoSocial: cj?.razao }, ctx);
+    const pal = palavraPorId.get(advertiserId);
+    const palavraErrada = pal?.verificado && !pal.algumOk ? [...pal.ausentes] : null;
+    const r = avaliarLead({ dominio: g.dominio, regioes: g.regioes, site: c ? resumoSite(c) : null,
+      cnpjs: cj?.cnpjs, razaoSocial: cj?.razao, palavraErrada }, ctx);
     return {
       advertiser_id: advertiserId, prioridade: r.prioridade, telefone_principal: r.telefonePrincipal,
       outros_telefones: r.outrosTelefones, observacoes: r.observacoes, forca: r.forca,

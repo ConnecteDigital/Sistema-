@@ -13,6 +13,7 @@ export type SiteResumo = {
 export type EntradaLead = {
   dominio: string; regioes: PresencaRegiao[]; site: SiteResumo | null;
   cnpjs?: string[]; razaoSocial?: string | null;      // da consulta de CNPJ (só dígitos)
+  palavraErrada?: string[] | null;                    // termos anunciados que o site não menciona (null = ok/não verificado)
 };
 export type Contexto = {
   dominiosPorTelefone: Map<string, Set<string>>;   // numero → domínios que divulgam
@@ -115,6 +116,11 @@ export function avaliarLead(e: EntradaLead, ctx: Contexto): SaidaLead {
   if (e.regioes.length && e.regioes.every((r) => r.pctSitelinks === 0)) obs.push("Anúncio sem sitelinks.");
   if (e.regioes.some((r) => r.duplicado > 0)) obs.push("Aparece duas vezes na mesma busca: possivelmente duas contas de Google Ads.");
 
-  const prioridade: Prioridade = maxima ? "Máxima" : baixa ? "Baixa" : forca === "Forte" ? "Normal" : "Alta";
+  if (e.palavraErrada?.length) {
+    obs.unshift(`Apareceu na busca de "${e.palavraErrada.slice(0, 2).join('", "')}" mas o site não fala disso: está anunciando na palavra-chave errada (pagando clique de quem procura outro serviço). Argumento forte.`);
+  }
+  // palavra errada = desperdício de verba: sobe Normal para Alta
+  const prioridade: Prioridade = maxima ? "Máxima" : baixa ? "Baixa"
+    : forca === "Forte" && !e.palavraErrada?.length ? "Normal" : "Alta";
   return { prioridade, telefonePrincipal: principal?.formatado ?? null, outrosTelefones: outros, observacoes: obs, forca, presenca };
 }

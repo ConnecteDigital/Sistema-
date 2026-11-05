@@ -1,6 +1,7 @@
 import "server-only";
 import { normalizarTelefone, type Telefone } from "./telefone";
 import { extrairCnpjs } from "./cnpj";
+import { normalizar } from "./palavra";
 
 // Verificação de site pelo nosso servidor (seção 9). Grátis.
 
@@ -63,6 +64,7 @@ export type TagGoogle = "sim" | "so_gtm" | "nao" | "nao_verificado";
 export type Analise = {
   situacao: Situacao; motivo: string | null; telefones: Telefone[]; whatsapps: Telefone[];
   tagsAw: string[]; tagsGtm: string[]; ga4: string[]; tagGoogle: TagGoogle; cnpjs: string[]; wordpress: boolean;
+  texto: string;   // texto visível normalizado (sem acento, minúsculo), até 50 mil caracteres
 };
 
 function textoVisivel(html: string) {
@@ -77,7 +79,7 @@ function unicos(ts: (Telefone | null)[]) {
 }
 
 export function analisarPagina(p: Pagina): Analise {
-  const vazio = { telefones: [], whatsapps: [], tagsAw: [], tagsGtm: [], ga4: [], cnpjs: [], wordpress: false };
+  const vazio = { telefones: [], whatsapps: [], tagsAw: [], tagsGtm: [], ga4: [], cnpjs: [], wordpress: false, texto: "" };
   if (p.erroRede === "dns") return { ...vazio, situacao: "dns", motivo: "Domínio não existe (falha de DNS)", tagGoogle: "nao_verificado" };
   if (p.erroRede) return { ...vazio, situacao: "fora_do_ar", motivo: p.erroRede === "timeout" ? "Site não respondeu (tempo esgotado)" : `Site não abre (${p.erroMsg})`, tagGoogle: "nao_verificado" };
 
@@ -122,5 +124,11 @@ export function analisarPagina(p: Pagina): Analise {
   return {
     situacao, motivo, telefones, whatsapps, tagsAw, tagsGtm, ga4, tagGoogle,
     cnpjs: extrairCnpjs(textoVisivel(html)), wordpress: /wp-content|wp-includes/i.test(html),
+    // título e descrição contam como conteúdo do site
+    texto: normalizar([
+      html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "",
+      html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)/i)?.[1] ?? "",
+      textoVisivel(html),
+    ].join(" ")).slice(0, 50_000),
   };
 }

@@ -1,40 +1,12 @@
 import Link from "next/link";
-import { COR_PRIORIDADE, linkWhats } from "@/components/selos";
+import { COR_PRIORIDADE, ROTULO_SITUACAO, linkWhats } from "@/components/selos";
 import { BotaoCopiar } from "./copiar";
 import type { Linha } from "./tabela";
 
-const PESO: Record<string, number> = { "Máxima": 0, Alta: 1, Normal: 2, Baixa: 3 };
+import { montarDonos } from "@/lib/donos";
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 
-type Dono = {
-  principal: Linha; sites: string[]; regioes: string[]; prioridade: string; presenca: number;
-  telefone: string | null; empresa: string; cnpj: string | null;
-};
-
-/** Um dono por linha (sites com mesmo CNPJ/telefone/tag juntos), na ordem de quem ligar primeiro. */
-function montarDonos(linhas: Linha[]): Dono[] {
-  const porGrupo = new Map<number, Linha[]>();
-  for (const l of linhas) {
-    if (!porGrupo.has(l.grupo)) porGrupo.set(l.grupo, []);
-    porGrupo.get(l.grupo)!.push(l);
-  }
-  const donos: Dono[] = [];
-  for (const ls of porGrupo.values()) {
-    const ord = [...ls].sort((a, b) => (PESO[a.prioridade ?? ""] ?? 9) - (PESO[b.prioridade ?? ""] ?? 9) || a.presenca - b.presenca);
-    const p = ord[0];
-    const comTel = ord.find((x) => x.telefone);
-    const comCnpj = ord.find((x) => x.razaoSocial || x.cnpjPrincipal);
-    donos.push({
-      principal: p, sites: [...new Set(ls.map((x) => x.dominio))], regioes: [...new Set(ls.map((x) => x.regiao))],
-      prioridade: p.prioridade ?? "Normal", presenca: Math.max(...ls.map((x) => x.presenca)),
-      telefone: comTel?.telefone ?? null,
-      empresa: comCnpj?.razaoSocial ?? p.nome ?? p.dominio, cnpj: comCnpj?.cnpjPrincipal ?? null,
-    });
-  }
-  return donos.sort((a, b) => (PESO[a.prioridade] ?? 9) - (PESO[b.prioridade] ?? 9) || a.presenca - b.presenca);
-}
-
-export function RelatorioLigacao({ linhas }: { linhas: Linha[] }) {
+export function RelatorioLigacao({ linhas, semResumo = false, titulo = "Relatório — quem ligar" }: { linhas: Linha[]; semResumo?: boolean; titulo?: string }) {
   const donos = montarDonos(linhas);
   const ligar = donos.filter((d) => d.prioridade !== "Baixa");
   const conta = (p: string) => donos.filter((d) => d.prioridade === p).length;
@@ -51,11 +23,11 @@ export function RelatorioLigacao({ linhas }: { linhas: Linha[] }) {
   return (
     <section className="cartao space-y-4 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold">Relatório — quem ligar</h2>
+        <h2 className="text-lg font-semibold">{titulo}</h2>
         <BotaoCopiar texto={texto} />
       </div>
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+      {!semResumo && <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
         {[
           { n: ligar.length, rotulo: "para ligar", cor: "text-marca" },
           { n: foraDoAr, rotulo: "site fora do ar (ligar já)", cor: foraDoAr ? "text-red-600" : "text-texto" },
@@ -68,7 +40,7 @@ export function RelatorioLigacao({ linhas }: { linhas: Linha[] }) {
             <p className="text-xs text-suave">{c.rotulo}</p>
           </div>
         ))}
-      </div>
+      </div>}
       <p className="text-xs text-suave">
         {linhas.length} sites viraram {donos.length} donos diferentes (mesmo CNPJ, telefone ou tag do Google = mesmo dono).
         {jaContatados > 0 && ` ${jaContatados} já tem status diferente de "A contatar".`}
@@ -93,8 +65,21 @@ export function RelatorioLigacao({ linhas }: { linhas: Linha[] }) {
                     ? <Link href={`/leads/${d.principal.leadId}`} className="font-medium hover:underline">{d.empresa}</Link>
                     : <span className="font-medium">{d.empresa}</span>}
                   {d.cnpj && <span className="block font-mono text-[11px] text-suave">CNPJ {d.cnpj}</span>}
-                  <span className="block text-xs text-suave">{d.sites.join(" · ").replaceAll("perfil-google:", "perfil Google: ")}</span>
-                  {d.sites.length > 1 && <span className="selo mt-0.5 bg-red-100 text-red-800">mesmo dono: {d.sites.length} sites</span>}
+                  <span className="block text-xs">
+                    {d.sites.map((s, i) => (
+                      <span key={s}>
+                        {i > 0 && " · "}
+                        {s.startsWith("perfil-google:")
+                          ? <span className="text-suave">perfil Google</span>
+                          : <a href={`https://${s}`} target="_blank" rel="noreferrer" className="text-marca hover:underline">{s}</a>}
+                      </span>
+                    ))}
+                  </span>
+                  <span className="mt-0.5 flex flex-wrap gap-1">
+                    {d.sites.length > 1 && <span className="selo bg-red-100 text-red-800">mesmo dono: {d.sites.length} sites</span>}
+                    {d.problemaSite && <span className="selo bg-red-600 text-white">{ROTULO_SITUACAO[d.problemaSite] ?? d.problemaSite}</span>}
+                    {d.palavraErrada && <span className="selo bg-purple-100 text-purple-800">palavra-chave errada</span>}
+                  </span>
                 </td>
                 <td className="whitespace-nowrap pr-3 text-xs">
                   {d.telefone ? (
