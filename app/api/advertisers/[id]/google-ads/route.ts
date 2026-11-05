@@ -9,7 +9,7 @@ export const maxDuration = 30;
 const erro = (msg: string, status = 500) => NextResponse.json({ erro: msg }, { status });
 
 async function anunciante(id: number) {
-  const { data } = await db().from("advertisers").select("id, dominio").eq("id", id).maybeSingle();
+  const { data } = await db().from("advertisers").select("id, dominio, nome").eq("id", id).maybeSingle();
   return data;
 }
 
@@ -61,7 +61,9 @@ export async function GET(_: Request, ctx: { params: Promise<{ id: string }> }) 
         return NextResponse.json({ status: "pendente", etapa: 2, resultado: resumo });
       }
       // Nada pelo domínio → plano B: procurar pelo nome, como a caixa de busca da Transparência
-      const palavra = adv!.dominio.replace(/\.(com|net|org|ind|eng|eco|app|tec|srv|adv|art|blog|emp|bsb)?\.?br$|\.com$|\.net$/, "");
+      // nome que aparece no anúncio (ex.: "Desentupidora Rápida") é melhor que o domínio; senão, o domínio sem o .com.br
+      const nomeAnuncio = adv!.nome && !/\.[a-z]{2,}$/i.test(adv!.nome.trim()) ? adv!.nome.trim() : null;
+      const palavra = nomeAnuncio ?? adv!.dominio.replace(/\.(com|net|org|ind|eng|eco|app|tec|srv|adv|art|blog|emp|bsb)?\.?br$|\.com$|\.net$/, "");
       const task = await postarBuscaNome(palavra);
       await salvar({ task_conta: "nome:" + task, resultado: { ...resumo, buscaNome: palavra }, bruto: { etapa1: [], diag } });
       return NextResponse.json({ status: "pendente", etapa: 2, resultado: resumo });
