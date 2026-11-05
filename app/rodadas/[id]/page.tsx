@@ -3,6 +3,7 @@ import { db } from "@/lib/supabase";
 import { progresso } from "@/lib/motor";
 import { formatarData } from "@/lib/utils";
 import { Executor } from "./executor";
+import { BotoesRepetir } from "@/components/botoes-repetir";
 import { TabelaAnunciantes } from "./tabela";
 import { RelatorioLigacao } from "./relatorio";
 import { buscarLinhasBanco, montarLinhas } from "@/lib/rodada-dados";
@@ -10,8 +11,9 @@ import { buscarLinhasBanco, montarLinhas } from "@/lib/rodada-dados";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Rodada" };
 
-export default async function Rodada({ params }: { params: Promise<{ id: string }> }) {
+export default async function Rodada({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ erro?: string }> }) {
   const id = Number((await params).id);
+  const { erro: erroRepetir } = await searchParams;
   if (!Number.isInteger(id)) notFound();
   const { data: run } = await db().from("runs").select("*").eq("id", id).maybeSingle();
   if (!run) notFound();
@@ -36,13 +38,17 @@ export default async function Rodada({ params }: { params: Promise<{ id: string 
 
   return (
     <main className="mx-auto max-w-6xl space-y-5 p-4">
-      <div>
-        <p className="text-xs text-suave">Rodada #{id} · {formatarData(run.criado_em)}</p>
-        <h1 className="text-xl font-semibold">{(run.termos as string[]).join(" · ")}</h1>
-        <p className="text-sm text-suave">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs text-suave">Rodada #{id} · {formatarData(run.criado_em)}</p>
+          <h1 className="text-xl font-semibold">{(run.termos as string[]).join(" · ")}</h1>
+          <p className="text-sm text-suave">
           {regioes.join(", ")} · {pontos.length} pontos · {run.total_buscas} buscas · celular
-        </p>
+          </p>
+        </div>
+        <BotoesRepetir rodada={id} criadaEm={run.criado_em} />
       </div>
+      {erroRepetir && <p className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">Não deu para repetir: {erroRepetir}</p>}
 
       <Executor runId={id} inicial={prog} semLeads={semLeads} />
 

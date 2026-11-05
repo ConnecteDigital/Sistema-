@@ -7,6 +7,27 @@ type Nicho = { nome: string; modelos: string[] };
 type Regiao = { id: number; nome: string; uf: string; ddd: string };
 type Local = { id: number; region_id: number; nome_exibicao: string; camada: string };
 export type Dados = { nichos: Nicho[]; regioes: Regiao[]; locais: Local[]; creditos: number };
+export type Inicial = { rodada: number; termos: string[]; locationIds: number[] };
+
+/** Pré-preenche o formulário com uma rodada anterior ("Ajustar e repetir"). */
+function estadoInicial(dados: Dados, inicial?: Inicial | null) {
+  if (!inicial?.termos.length) return null;
+  const termo = inicial.termos[0];
+  const nicho = nichoDoTermo(termo, dados.nichos);
+  const sug = [...new Set((nicho?.modelos ?? GENERICO).map((m) => m.replaceAll("{termo}", termo)))];
+  const escolhidos = new Set(inicial.termos);
+  const ids = new Set(inicial.locationIds);
+  const regioes = new Set(dados.locais.filter((l) => ids.has(l.id)).map((l) => l.region_id));
+  return {
+    termo,
+    marcadas: new Set(sug.filter((s) => escolhidos.has(s))),
+    desmarcadas: new Set(sug.filter((s) => !escolhidos.has(s))),
+    extras: inicial.termos.filter((t) => !sug.includes(t)),
+    regioes,
+    uf: dados.regioes.find((r) => regioes.has(r.id))?.uf ?? "",
+    pontosFora: new Set(dados.locais.filter((l) => regioes.has(l.region_id) && !ids.has(l.id)).map((l) => l.id)),
+  };
+}
 
 const CAMADAS = [
   { v: "minima", rotulo: "Mínima", dica: "capital / polo" },
@@ -24,17 +45,19 @@ function nichoDoTermo(termo: string, nichos: Nicho[]): Nicho | null {
   return nichos.find((n) => t.includes(norm(n.nome)) || (t.split(" ")[0].length >= 4 && norm(n.nome).includes(t.split(" ")[0]))) ?? null;
 }
 
-export function FormPesquisa({ dados }: { dados: Dados }) {
-  const [termo, setTermo] = useState("");
+export function FormPesquisa({ dados, inicial }: { dados: Dados; inicial?: Inicial | null }) {
+  const [ini] = useState(() => estadoInicial(dados, inicial));
+  const [termo, setTermo] = useState(ini?.termo ?? "");
   const [nichoEscolhido, setNichoEscolhido] = useState<string>("auto");
-  const [marcadas, setMarcadas] = useState<Set<string>>(new Set());
-  const [desmarcadas, setDesmarcadas] = useState<Set<string>>(new Set());
-  const [extras, setExtras] = useState<string[]>([]);
+  const [marcadas, setMarcadas] = useState<Set<string>>(ini?.marcadas ?? new Set());
+  const [desmarcadas, setDesmarcadas] = useState<Set<string>>(ini?.desmarcadas ?? new Set());
+  const [extras, setExtras] = useState<string[]>(ini?.extras ?? []);
   const [novaExtra, setNovaExtra] = useState("");
-  const [uf, setUf] = useState("");
-  const [regioesSel, setRegioesSel] = useState<Set<number>>(new Set());
-  const [camada, setCamada] = useState<"minima" | "media" | "ampla">("media");
-  const [pontosFora, setPontosFora] = useState<Set<number>>(new Set());
+  const [uf, setUf] = useState(ini?.uf ?? "");
+  const [regioesSel, setRegioesSel] = useState<Set<number>>(ini?.regioes ?? new Set());
+  // repetindo: mostra "Ampla" com os pontos que não estavam na rodada já riscados
+  const [camada, setCamada] = useState<"minima" | "media" | "ampla">(ini ? "ampla" : "media");
+  const [pontosFora, setPontosFora] = useState<Set<number>>(ini?.pontosFora ?? new Set());
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, iniciar] = useTransition();
 
@@ -85,6 +108,12 @@ export function FormPesquisa({ dados }: { dados: Dados }) {
 
   return (
     <div className="space-y-6">
+      {inicial && (
+        <p className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+          Preenchido com a rodada #{inicial.rodada}: {inicial.termos.length} variações e {inicial.locationIds.length} pontos.
+          Ajuste o que quiser e clique em Pesquisar.
+        </p>
+      )}
       {/* 1. Palavra-chave */}
       <div>
         <input

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { db } from "@/lib/supabase";
 import { formatarData } from "@/lib/utils";
+import { BotoesRepetir } from "@/components/botoes-repetir";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Rodadas" };
@@ -20,10 +21,10 @@ export default async function Rodadas() {
         <p className="text-sm text-suave">Nenhuma rodada ainda. <Link href="/" className="text-marca hover:underline">Fazer uma pesquisa</Link></p>
       ) : (
         <div className="cartao overflow-x-auto">
-          <table className="w-full min-w-[560px] text-sm">
+          <table className="w-full min-w-[720px] text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase text-suave">
               <tr><th className="px-3 py-2">#</th><th className="px-3 py-2">Quando</th><th className="px-3 py-2">Termos</th>
-                <th className="px-3 py-2 text-right">Buscas</th><th className="px-3 py-2">Status</th></tr>
+                <th className="px-3 py-2 text-right">Buscas</th><th className="px-3 py-2">Status</th><th className="px-3 py-2"></th></tr>
             </thead>
             <tbody>
               {data.map((r) => (
@@ -33,6 +34,7 @@ export default async function Rodadas() {
                   <td className="px-3 py-2"><Link href={`/rodadas/${r.id}`} className="hover:underline">{(r.termos as string[]).join(" · ")}</Link></td>
                   <td className="px-3 py-2 text-right tabular-nums">{r.buscas_ok}/{r.total_buscas}</td>
                   <td className={`px-3 py-2 ${r.erro ? "text-red-600" : ""}`}>{r.erro ? "Parada" : STATUS[r.status] ?? r.status}</td>
+                  <td className="px-3 py-2"><BotoesRepetir rodada={r.id} criadaEm={r.criado_em} compacto /></td>
                 </tr>
               ))}
             </tbody>
