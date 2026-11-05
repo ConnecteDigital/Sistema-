@@ -4,6 +4,7 @@ import { ordemPrioridade } from "@/lib/regras";
 import { COR_FORCA, COR_PRIORIDADE, linkWhats } from "@/components/selos";
 import { CampoData, CampoResponsavel, CampoStatus } from "./campos";
 import { STATUS_LEAD as STATUS } from "@/lib/status";
+import { OptinWhatsApp } from "@/components/optin-whatsapp";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Leads" };
@@ -29,6 +30,12 @@ export default async function Leads({ searchParams }: { searchParams: Promise<SP
     .filter((l) => !q || l.advertisers.dominio.includes(q) || (l.advertisers.nome ?? "").toLowerCase().includes(q)
       || (l.telefone_principal ?? "").includes(q) || (l.razao_social ?? "").toLowerCase().includes(q) || (l.cnpj ?? "").replace(/\D/g, "").includes(q.replace(/\D/g, "") || "#"))
     .sort((a, b) => ordemPrioridade(a.prioridade ?? "") - ordemPrioridade(b.prioridade ?? "") || Number(a.presenca ?? 0) - Number(b.presenca ?? 0));
+  const tels = [...new Set(lista.map((l) => "55" + (l.telefone_principal ?? "").replace(/\D/g, "")).filter((t) => t.length === 13))];
+  const contatosWa = new Map<string, { optin_em: string | null; optout_em: string | null }>();
+  for (let i = 0; i < tels.length; i += 300) {
+    const { data: cs } = await db().from("wa_contatos").select("telefone, optin_em, optout_em").in("telefone", tels.slice(i, i + 300));
+    for (const c of cs ?? []) contatosWa.set(c.telefone, c);
+  }
   const cnpjRepetido = new Map<string, number>();
   for (const l of (leads.data ?? []) as unknown as L[]) if (l.cnpj) cnpjRepetido.set(l.cnpj, (cnpjRepetido.get(l.cnpj) ?? 0) + 1);
   const regioes = [...new Set(((leads.data ?? []) as unknown as L[]).flatMap((l) => l.regioes))].sort();
@@ -100,6 +107,10 @@ export default async function Leads({ searchParams }: { searchParams: Promise<SP
                         {linkWhats(l.telefone_principal) && (
                           <a href={linkWhats(l.telefone_principal)!} target="_blank" rel="noreferrer" className="ml-1 text-green-700 hover:underline">zap</a>
                         )}
+                        {linkWhats(l.telefone_principal) && (() => {
+                          const c = contatosWa.get("55" + l.telefone_principal!.replace(/\D/g, ""));
+                          return <span className="mt-1 block"><OptinWhatsApp leadId={l.id} autorizado={!!c?.optin_em} saiu={!!c?.optout_em} compacto /></span>;
+                        })()}
                       </>
                     ) : "—"}
                   </td>

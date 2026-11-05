@@ -7,6 +7,7 @@ import { COR_FORCA, COR_PRIORIDADE, ROTULO_SITUACAO, ROTULO_TAG, linkWhats } fro
 import { CampoData, CampoNotas, CampoResponsavel, CampoStatus } from "../campos";
 import { OutrosDominios } from "./outros-dominios";
 import { ContaGoogleAds } from "@/components/conta-google-ads";
+import { OptinWhatsApp } from "@/components/optin-whatsapp";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Lead" };
@@ -18,7 +19,8 @@ export default async function Lead({ params }: { params: Promise<{ id: string }>
   if (!lead) notFound();
   const adv = lead.advertisers as { id: number; dominio: string; nome: string | null; primeiro_visto: string; ultimo_visto: string };
 
-  const [historico, site, cnpj, eventos, equipe, outros, contaAds] = await Promise.all([
+  const telE164 = (lead.telefone_principal ?? "").replace(/\D/g, "");
+  const [historico, site, cnpj, eventos, equipe, outros, contaAds, waContato] = await Promise.all([
     db().from("run_advertisers")
       .select("run_id, presenca, aparicoes, buscas, forca, pos_media, pct_topo, pct_sitelinks, titulo, link, pontos, termos, regions(nome), runs(criado_em)")
       .eq("advertiser_id", adv.id).order("run_id", { ascending: false }).limit(50),
@@ -28,6 +30,7 @@ export default async function Lead({ params }: { params: Promise<{ id: string }>
     db().from("equipe").select("id, nome").eq("ativo", true).order("nome"),
     db().from("lead_dominios").select("dominio, resultado, consultado_em").eq("lead_id", id).order("consultado_em", { ascending: false }),
     db().from("contas_google_ads").select("status, resultado, erro, consultado_em, bruto").eq("advertiser_id", adv.id).maybeSingle(),
+    db().from("wa_contatos").select("optin_em, optout_em").eq("telefone", "55" + telE164).maybeSingle(),
   ]);
   type H = { run_id: number; presenca: number; aparicoes: number; buscas: number; forca: string; pos_media: number | null;
     pct_topo: number; pct_sitelinks: number; titulo: string | null; link: string | null; pontos: string[]; termos: string[];
@@ -63,6 +66,9 @@ export default async function Lead({ params }: { params: Promise<{ id: string }>
             </p>
           ) : <p className="text-suave">Telefone não encontrado.</p>}
           {lead.outros_telefones?.length > 0 && <p className="text-xs text-suave">Outros: {lead.outros_telefones.join(" · ")}</p>}
+          {telE164.length === 11 && (
+            <OptinWhatsApp leadId={id} autorizado={!!waContato.data?.optin_em} saiu={!!waContato.data?.optout_em} />
+          )}
           <div className="pt-1">{!perfil && <ConsultaCnpj advertiserId={adv.id} inicial={cnpj.data ?? null} />}</div>
         </section>
       </div>

@@ -12,6 +12,7 @@ const links = [
   { href: "/rodadas", rotulo: "Rodadas" },
   { href: "/leads", rotulo: "Leads" },
   { href: "/relatorios", rotulo: "Relatórios" },
+  { href: "/disparos", rotulo: "Disparos" },
   { href: "/configuracoes", rotulo: "Configurações" },
 ];
 

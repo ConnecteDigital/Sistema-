@@ -23,5 +23,5 @@ export async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!acesso|api/cron|_next/static|_next/image|favicon.ico|robots.txt|icon.svg).*)"],
+  matcher: ["/((?!acesso|api/cron|api/whatsapp/webhook|_next/static|_next/image|favicon.ico|robots.txt|icon.svg).*)"],
 };
