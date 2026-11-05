@@ -4,6 +4,9 @@ import { progresso } from "@/lib/motor";
 import { formatarData } from "@/lib/utils";
 import { Executor } from "./executor";
 import { TabelaAnunciantes, type Linha } from "./tabela";
+import { RelatorioLigacao } from "./relatorio";
+import { agruparDonos } from "@/lib/grupos";
+import type { ResultadoCnpj } from "@/lib/consulta-cnpj";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Rodada" };
@@ -31,8 +34,8 @@ export default async function Rodada({ params }: { params: Promise<{ id: string 
   const listaA = (anunc.data ?? []) as unknown as A[];
   const advIds = [...new Set(listaA.map((a) => a.advertiser_id))];
   const [leads, sites, cnpjs] = advIds.length ? await Promise.all([
-    db().from("leads").select("id, advertiser_id, prioridade, telefone_principal, outros_telefones, observacoes").in("advertiser_id", advIds),
-    db().from("site_checks_recentes").select("advertiser_id, situacao, tag_google").in("advertiser_id", advIds),
+    db().from("leads").select("id, advertiser_id, prioridade, telefone_principal, outros_telefones, observacoes, status, cnpj, razao_social").in("advertiser_id", advIds),
+    db().from("site_checks_recentes").select("advertiser_id, situacao, tag_google, tags_aw").in("advertiser_id", advIds),
     db().from("consultas_cnpj").select("advertiser_id, resultado, consultado_em").in("advertiser_id", advIds),
   ]) : [{ data: [] }, { data: [] }, { data: [] }];
   const leadPor = new Map((leads.data ?? []).map((l) => [l.advertiser_id, l]));
@@ -51,8 +54,19 @@ export default async function Rodada({ params }: { params: Promise<{ id: string 
     observacoes: prog.status === "pronta" ? (leadPor.get(a.advertiser_id)?.observacoes ?? []) : [],
     situacao: sitePor.get(a.advertiser_id)?.situacao ?? null, tagGoogle: sitePor.get(a.advertiser_id)?.tag_google ?? null,
     cnpj: cnpjPor.get(a.advertiser_id) ? { resultado: cnpjPor.get(a.advertiser_id)!.resultado, consultado_em: cnpjPor.get(a.advertiser_id)!.consultado_em } : null,
+    cnpjPrincipal: leadPor.get(a.advertiser_id)?.cnpj ?? null,
+    razaoSocial: leadPor.get(a.advertiser_id)?.razao_social ?? null,
+    cnpjs: ((cnpjPor.get(a.advertiser_id)?.resultado as ResultadoCnpj | undefined)?.encontrados ?? []).map((x) => x.cnpj.replace(/\D/g, "")),
+    tags: sitePor.get(a.advertiser_id)?.tags_aw ?? [],
+    statusLead: leadPor.get(a.advertiser_id)?.status ?? null,
+    grupo: a.advertiser_id,
   }));
-  const semLeads = prog.status === "pronta" && linhas.length > 0 && linhas.every((l) => !l.prioridade);
+  const grupos = agruparDonos([...new Map(linhas.map((l) => [l.advertiserId, l])).values()].map((l) => ({
+    id: l.advertiserId, cnpjs: l.cnpjs, telefones: [l.telefone, ...l.outrosTelefones].filter((t): t is string => !!t), tags: l.tags,
+  })));
+  for (const l of linhas) l.grupo = grupos.get(l.advertiserId) ?? l.advertiserId;
+  const semLeads = prog.status === "pronta" && linhas.length > 0 &&
+    linhas.some((l) => !l.prioridade || (!l.dominio.startsWith("perfil-google:") && !l.cnpj));
 
   type B = { id: number; termo: string; status: string; qtd_anuncios: number | null; erro: string | null;
     location_usada: string | null; locations: { nome_exibicao: string; regions: { nome: string } } };
@@ -71,6 +85,8 @@ export default async function Rodada({ params }: { params: Promise<{ id: string 
       </div>
 
       <Executor runId={id} inicial={prog} semLeads={semLeads} />
+
+      {prog.status === "pronta" && linhas.some((l) => l.prioridade) && <RelatorioLigacao linhas={linhas} />}
 
       {linhas.length > 0 ? (
         <TabelaAnunciantes linhas={linhas} />

@@ -12,7 +12,7 @@ type SP = { prioridade?: string; status?: string; q?: string; regiao?: string };
 export default async function Leads({ searchParams }: { searchParams: Promise<SP> }) {
   const f = await searchParams;
   let consulta = db().from("leads")
-    .select("id, prioridade, telefone_principal, outros_telefones, observacoes, status, responsavel_id, data_contato, forca, presenca, regioes, atualizado_em, advertisers(dominio, nome)")
+    .select("id, prioridade, telefone_principal, outros_telefones, observacoes, status, responsavel_id, data_contato, forca, presenca, regioes, atualizado_em, cnpj, razao_social, advertisers(dominio, nome)")
     .limit(2000);
   if (f.prioridade) consulta = consulta.eq("prioridade", f.prioridade);
   if (f.status) consulta = consulta.eq("status", f.status);
@@ -22,11 +22,14 @@ export default async function Leads({ searchParams }: { searchParams: Promise<SP
   ]);
   type L = { id: number; prioridade: string | null; telefone_principal: string | null; outros_telefones: string[];
     observacoes: string[]; status: string; responsavel_id: number | null; data_contato: string | null; forca: string | null;
-    presenca: number | null; regioes: string[]; atualizado_em: string; advertisers: { dominio: string; nome: string | null } };
+    presenca: number | null; regioes: string[]; atualizado_em: string; cnpj: string | null; razao_social: string | null; advertisers: { dominio: string; nome: string | null } };
   const q = (f.q ?? "").toLowerCase().trim();
   const lista = ((leads.data ?? []) as unknown as L[])
-    .filter((l) => !q || l.advertisers.dominio.includes(q) || (l.advertisers.nome ?? "").toLowerCase().includes(q) || (l.telefone_principal ?? "").includes(q))
+    .filter((l) => !q || l.advertisers.dominio.includes(q) || (l.advertisers.nome ?? "").toLowerCase().includes(q)
+      || (l.telefone_principal ?? "").includes(q) || (l.razao_social ?? "").toLowerCase().includes(q) || (l.cnpj ?? "").replace(/\D/g, "").includes(q.replace(/\D/g, "") || "#"))
     .sort((a, b) => ordemPrioridade(a.prioridade ?? "") - ordemPrioridade(b.prioridade ?? "") || Number(a.presenca ?? 0) - Number(b.presenca ?? 0));
+  const cnpjRepetido = new Map<string, number>();
+  for (const l of (leads.data ?? []) as unknown as L[]) if (l.cnpj) cnpjRepetido.set(l.cnpj, (cnpjRepetido.get(l.cnpj) ?? 0) + 1);
   const regioes = [...new Set(((leads.data ?? []) as unknown as L[]).flatMap((l) => l.regioes))].sort();
 
   return (
@@ -35,7 +38,7 @@ export default async function Leads({ searchParams }: { searchParams: Promise<SP
       {leads.error && <p className="text-sm text-red-600">{leads.error.message} — rodou o 0004_sites_leads.sql?</p>}
 
       <form className="flex flex-wrap gap-2">
-        <input name="q" defaultValue={f.q} placeholder="Buscar nome, site ou telefone" className="campo w-full sm:w-64" />
+        <input name="q" defaultValue={f.q} placeholder="Buscar nome, site, telefone ou CNPJ" className="campo w-full sm:w-64" />
         <select name="prioridade" defaultValue={f.prioridade ?? ""} className="campo">
           <option value="">Toda prioridade</option>
           {["Máxima", "Alta", "Normal", "Baixa"].map((p) => <option key={p}>{p}</option>)}
@@ -79,6 +82,14 @@ export default async function Leads({ searchParams }: { searchParams: Promise<SP
                   <td className="px-3 py-2">
                     <Link href={`/leads/${l.id}`} className="font-medium hover:underline">{l.advertisers.nome ?? l.advertisers.dominio}</Link>
                     <span className="block text-xs text-suave">{l.advertisers.dominio.replace("perfil-google:", "perfil Google: ")}</span>
+                    {(l.razao_social || l.cnpj) && (
+                      <span className="block text-[11px]">
+                        {l.razao_social}{l.cnpj && <span className="ml-1 font-mono text-suave">{l.cnpj}</span>}
+                        {l.cnpj && (cnpjRepetido.get(l.cnpj) ?? 0) > 1 && (
+                          <span className="selo ml-1 bg-red-100 text-red-800">mesmo CNPJ em {cnpjRepetido.get(l.cnpj)} sites</span>
+                        )}
+                      </span>
+                    )}
                     <span className="block text-[11px] text-suave">{l.regioes.join(", ")}</span>
                   </td>
                   <td className="whitespace-nowrap px-3 py-2 text-xs">

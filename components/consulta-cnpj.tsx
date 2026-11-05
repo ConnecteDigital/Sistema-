@@ -45,7 +45,12 @@ export function ConsultaCnpj({ advertiserId, inicial, compacto = false }: {
         ) : (
           <button onClick={() => setAberto((a) => !a)} className="whitespace-nowrap text-left text-xs">
             {principal ? (
-              <span className="font-medium text-texto">{principal.razaoSocial ?? principal.cnpj}</span>
+              <>
+                <span className="font-medium text-texto">{principal.razaoSocial ?? principal.cnpj}</span>
+                <span className="block font-mono text-[11px] text-suave">{principal.cnpj}</span>
+              </>
+            ) : res?.encontrados[0] ? (
+              <span className="font-mono text-texto">{res.encontrados[0].cnpj}</span>
             ) : res?.titularDominio?.nome ? (
               <span className="font-medium text-texto">{res.titularDominio.nome}</span>
             ) : (

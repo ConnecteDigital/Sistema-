@@ -19,6 +19,8 @@ export async function POST(_: Request, ctx: { params: Promise<{ id: string }> })
     const resultado = await consultarCnpjDoSite(adv.dominio, ultimo?.link ?? null);
     const consultado_em = new Date().toISOString();
     await db().from("consultas_cnpj").upsert({ advertiser_id: id, resultado, consultado_em }, { onConflict: "advertiser_id" });
+    const principal = resultado.empresas[0]?.cnpj ?? resultado.encontrados[0]?.cnpj ?? null;
+    await db().from("leads").update({ cnpj: principal, razao_social: resultado.empresas[0]?.razaoSocial ?? null }).eq("advertiser_id", id);
     return NextResponse.json({ resultado, consultado_em });
   } catch (e) {
     return NextResponse.json({ erro: e instanceof Error ? e.message : String(e) }, { status: 500 });

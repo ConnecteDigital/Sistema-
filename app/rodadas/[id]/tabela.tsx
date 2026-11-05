@@ -10,7 +10,8 @@ export type Linha = {
   pct_sitelinks: number; titulo: string | null; link: string | null; forca: string; duplicado: number;
   advertiserId: number; leadId: number | null; prioridade: string | null; telefone: string | null;
   outrosTelefones: string[]; observacoes: string[]; situacao: string | null; tagGoogle: string | null;
-  cnpj: CnpjSalvo;
+  cnpj: CnpjSalvo; cnpjPrincipal: string | null; razaoSocial: string | null; cnpjs: string[];
+  tags: string[]; statusLead: string | null; grupo: number;
 };
 const PESO: Record<string, number> = { "Máxima": 0, Alta: 1, Normal: 2, Baixa: 3 };
 
@@ -25,6 +26,13 @@ export function TabelaAnunciantes({ linhas }: { linhas: Linha[] }) {
   const [prioridade, setPrioridade] = useState("");
   const temLeads = linhas.some((l) => l.prioridade);
   const [ordem, setOrdem] = useState<Ordem>(temLeads ? "prioridade" : "presenca_desc");
+
+  // Quantos sites desta rodada têm o mesmo CNPJ
+  const sitesPorCnpj = useMemo(() => {
+    const m = new Map<string, Set<string>>();
+    for (const l of linhas) for (const c of l.cnpjs) { if (!m.has(c)) m.set(c, new Set()); m.get(c)!.add(l.dominio); }
+    return m;
+  }, [linhas]);
 
   const visiveis = linhas
     .filter((l) => (!regiao || l.regiao === regiao) && (!forca || l.forca === forca) && (!prioridade || l.prioridade === prioridade))
@@ -155,7 +163,18 @@ export function TabelaAnunciantes({ linhas }: { linhas: Linha[] }) {
                   </td>
                   <td className="px-3 py-2">
                     {perfil ? <span className="text-xs text-suave">sem site</span> : (
-                      <ConsultaCnpj advertiserId={l.advertiserId} inicial={l.cnpj} compacto />
+                      <>
+                        <ConsultaCnpj advertiserId={l.advertiserId} inicial={l.cnpj} compacto />
+                        {(() => {
+                          const outros = new Set<string>();
+                          for (const c of l.cnpjs) for (const d of sitesPorCnpj.get(c) ?? []) if (d !== l.dominio) outros.add(d);
+                          return outros.size > 0 ? (
+                            <span className="selo mt-1 bg-red-100 text-red-800" title={[...outros].join(", ")}>
+                              mesmo CNPJ em +{outros.size} site{outros.size > 1 ? "s" : ""}
+                            </span>
+                          ) : null;
+                        })()}
+                      </>
                     )}
                   </td>
                 </tr>

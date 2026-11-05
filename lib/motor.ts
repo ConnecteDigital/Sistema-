@@ -7,6 +7,8 @@ import { agregar, type AdBruto, type BuscaOk, type Limites } from "./agregacao";
 import { analisarPagina, baixarPagina } from "./site";
 import { dominioRaiz, hostDe } from "./dominio";
 import { avaliarLead, montarContexto, type PresencaRegiao, type SiteResumo } from "./regras";
+import { consultarCnpjDoSite, type ResultadoCnpj } from "./consulta-cnpj";
+import { soDigitos } from "./cnpj";
 
 // ---------------------------------------------------------------------------
 // Configurações
@@ -100,14 +102,14 @@ export async function criarRodada(termos: string[], locationIds: number[]) {
 // ---------------------------------------------------------------------------
 export type Progresso = {
   status: string; total: number; feitas: number; erros: number; anunciantes: number; erro: string | null;
-  terminou: boolean; sitesTotal: number; sitesVerificados: number;
+  terminou: boolean; sitesTotal: number; sitesVerificados: number; cnpjTotal: number; cnpjFeitos: number;
 };
 
 export async function progresso(runId: number): Promise<Progresso> {
   const contar = (status: string) => db().from("run_searches").select("id", { count: "exact", head: true })
     .eq("run_id", runId).eq("status", status);
   const [run, ok, erro, anunc] = await Promise.all([
-    db().from("runs").select("status, total_buscas, erro, sites_total, sites_verificados").eq("id", runId).single(),
+    db().from("runs").select("status, total_buscas, erro, sites_total, sites_verificados, cnpj_total, cnpj_feitos").eq("id", runId).single(),
     contar("ok"), contar("erro"),
     db().from("run_advertisers").select("id", { count: "exact", head: true }).eq("run_id", runId),
   ]);
@@ -117,7 +119,7 @@ export async function progresso(runId: number): Promise<Progresso> {
       status: "desconhecido", total: 0, feitas: ok.count ?? 0, erros: erro.count ?? 0, anunciantes: 0,
       erro: "Erro ao ler a rodada no banco: " + (run.error?.message ?? "não encontrada") +
         ". Se falar de coluna/função que não existe, rode o 0003_motor.sql no Supabase.",
-      terminou: false, sitesTotal: 0, sitesVerificados: 0,
+      terminou: false, sitesTotal: 0, sitesVerificados: 0, cnpjTotal: 0, cnpjFeitos: 0,
     };
   }
   const status = run.data.status;
@@ -126,6 +128,7 @@ export async function progresso(runId: number): Promise<Progresso> {
     anunciantes: anunc.count ?? 0, erro: run.data.erro ?? null,
     terminou: status === "pronta" || status === "erro",
     sitesTotal: run.data.sites_total ?? 0, sitesVerificados: run.data.sites_verificados ?? 0,
+    cnpjTotal: run.data.cnpj_total ?? 0, cnpjFeitos: run.data.cnpj_feitos ?? 0,
   };
 }
 
@@ -354,19 +357,67 @@ async function verificarSitesLote(runId: number) {
   const pendentes = verificaveis.filter((id) => !recentes.has(id) || new Date(recentes.get(id)!).getTime() < limite);
 
   const LOTE = 8;
-  await Promise.all(pendentes.slice(0, LOTE).map((id) => {
-    const a = anunciantes.get(id)!;
-    return verificarSite(id, a.dominio, urlParaVerificar(a.dominio, a.link)).catch(() => {});
-  }));
+  if (pendentes.length) {
+    await Promise.all(pendentes.slice(0, LOTE).map((id) => {
+      const a = anunciantes.get(id)!;
+      return verificarSite(id, a.dominio, urlParaVerificar(a.dominio, a.link)).catch(() => {});
+    }));
+    await db().from("runs").update({
+      sites_total: verificaveis.length, sites_verificados: verificaveis.length - Math.max(0, pendentes.length - LOTE),
+    }).eq("id", runId);
+    return;
+  }
+  await db().from("runs").update({ sites_total: verificaveis.length, sites_verificados: verificaveis.length }).eq("id", runId);
 
-  const restantes = Math.max(0, pendentes.length - LOTE);
-  await db().from("runs").update({
-    sites_total: verificaveis.length, sites_verificados: verificaveis.length - restantes,
-  }).eq("id", runId);
-  if (restantes === 0) {
+  // Sites prontos → CNPJ automático → leads
+  const cnpjTerminou = await consultarCnpjsLote(runId, anunciantes, verificaveis);
+  if (cnpjTerminou) {
     await gerarLeads(runId);
     await db().from("runs").update({ status: "pronta", finalizada_em: new Date().toISOString() }).eq("id", runId);
   }
+}
+
+const CNPJ_VALIDO_DIAS = 30;
+
+/** Consulta o CNPJ de quem ainda não tem consulta recente. Devolve true quando não sobrar nenhum. */
+async function consultarCnpjsLote(
+  runId: number, anunciantes: Map<number, { dominio: string; link: string | null }>, verificaveis: number[],
+): Promise<boolean> {
+  const limite = Date.now() - CNPJ_VALIDO_DIAS * 86_400_000;
+  const feitos = new Set<number>();
+  for (let i = 0; i < verificaveis.length; i += 300) {
+    const { data, error } = await db().from("consultas_cnpj").select("advertiser_id, consultado_em")
+      .in("advertiser_id", verificaveis.slice(i, i + 300));
+    if (error) throw new Error(error.message);
+    for (const c of data ?? []) if (new Date(c.consultado_em).getTime() >= limite) feitos.add(c.advertiser_id);
+  }
+  const pendentes = verificaveis.filter((id) => !feitos.has(id));
+  const LOTE = 6;
+  const lote = pendentes.slice(0, LOTE);
+
+  if (lote.length) {
+    const { data: sites } = await db().from("site_checks_recentes").select("advertiser_id, cnpjs").in("advertiser_id", lote);
+    const cnpjsSite = new Map((sites ?? []).map((c) => [c.advertiser_id, (c.cnpjs ?? []) as string[]]));
+    await Promise.all(lote.map(async (id) => {
+      const a = anunciantes.get(id)!;
+      let resultado: ResultadoCnpj;
+      try {
+        resultado = await Promise.race([
+          consultarCnpjDoSite(a.dominio, a.link, { cnpjsDoSite: cnpjsSite.get(id) ?? [], paginasExtras: false }),
+          new Promise<never>((_, rej) => setTimeout(() => rej(new Error("tempo esgotado")), 40_000)),
+        ]);
+      } catch (e) {
+        resultado = { dominio: a.dominio, titularDominio: null, encontrados: [], empresas: [],
+          avisos: [`Consulta automática falhou (${e instanceof Error ? e.message : e}). Use "consultar de novo".`] };
+      }
+      await db().from("consultas_cnpj").upsert(
+        { advertiser_id: id, resultado, consultado_em: new Date().toISOString() }, { onConflict: "advertiser_id" });
+    }));
+  }
+  await db().from("runs").update({
+    cnpj_total: verificaveis.length, cnpj_feitos: verificaveis.length - Math.max(0, pendentes.length - lote.length),
+  }).eq("id", runId);
+  return pendentes.length <= lote.length;
 }
 
 type LinhaSite = {
@@ -391,7 +442,20 @@ export async function gerarLeads(runId: number) {
     .select("advertiser_id, situacao, motivo, telefones, whatsapps, tag_google, tags_aw, tags_gtm, advertisers(dominio)")
     .gte("verificado_em", desde).order("advertiser_id").range(de, ate) as never);
   const sitePorId = new Map(sites.map((c) => [c.advertiser_id, c]));
-  const ctx = montarContexto(sites.map((c) => ({ dominio: c.advertisers.dominio, site: resumoSite(c) })));
+
+  type LinhaCnpj = { advertiser_id: number; resultado: ResultadoCnpj; advertisers: { dominio: string } };
+  const consultas = await todas<LinhaCnpj>((de, ate) => db().from("consultas_cnpj")
+    .select("advertiser_id, resultado, advertisers(dominio)").gte("consultado_em", desde)
+    .order("advertiser_id").range(de, ate) as never);
+  const cnpjPorId = new Map(consultas.map((c) => [c.advertiser_id, {
+    cnpjs: (c.resultado?.encontrados ?? []).map((x) => soDigitos(x.cnpj)),
+    principal: c.resultado?.empresas?.[0]?.cnpj ?? c.resultado?.encontrados?.[0]?.cnpj ?? null,
+    razao: c.resultado?.empresas?.[0]?.razaoSocial ?? null,
+  }]));
+  const ctx = montarContexto(
+    sites.map((c) => ({ dominio: c.advertisers.dominio, site: resumoSite(c) })),
+    consultas.map((c) => ({ dominio: c.advertisers.dominio, cnpjs: cnpjPorId.get(c.advertiser_id)!.cnpjs })),
+  );
 
   const grupos = new Map<number, { dominio: string; regioes: PresencaRegiao[] }>();
   for (const l of linhas) {
@@ -405,12 +469,13 @@ export async function gerarLeads(runId: number) {
   const agora = new Date().toISOString();
   const leads = [...grupos].map(([advertiserId, g]) => {
     const c = sitePorId.get(advertiserId);
-    const r = avaliarLead({ dominio: g.dominio, regioes: g.regioes, site: c ? resumoSite(c) : null }, ctx);
+    const cj = cnpjPorId.get(advertiserId);
+    const r = avaliarLead({ dominio: g.dominio, regioes: g.regioes, site: c ? resumoSite(c) : null, cnpjs: cj?.cnpjs, razaoSocial: cj?.razao }, ctx);
     return {
       advertiser_id: advertiserId, prioridade: r.prioridade, telefone_principal: r.telefonePrincipal,
       outros_telefones: r.outrosTelefones, observacoes: r.observacoes, forca: r.forca,
       presenca: Number(r.presenca.toFixed(4)), regioes: g.regioes.map((x) => x.regiao), ultima_rodada: runId,
-      atualizado_em: agora,
+      cnpj: cj?.principal ?? null, razao_social: cj?.razao ?? null, atualizado_em: agora,
     };
   });
   // upsert só dos campos automáticos: status, responsável, notas e data do contato ficam como estão

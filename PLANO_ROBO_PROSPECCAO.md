@@ -260,6 +260,8 @@ Ao lado de cada anunciante, botão **"Consultar CNPJ"**. Só roda quando clicado
 
 A verificação automática de site (seção 9) também guarda os CNPJs achados no HTML (`site_checks.cnpjs`).
 
+**Revisão 4 — CNPJ automático:** a consulta roda sozinha como etapa 3 da rodada (buscas → sites → CNPJs → leads), reaproveitando os CNPJs achados na verificação do site. Os dados da Receita ficam em cache por CNPJ (`empresas_cnpj`, 90 dias): o mesmo CNPJ nunca é consultado duas vezes. Mesmo CNPJ em sites diferentes = mesmo dono (observação + agrupamento). A tela da rodada abre com o **Relatório — quem ligar**: um dono por linha (agrupado por CNPJ, telefone ou tag AW-), em ordem de prioridade, com telefone, argumento e botão para copiar a lista.
+
 ## 11. DataForSEO — usos de apoio (opcionais)
 
 Autenticação Basic (login:senha da API). Endpoints testados:

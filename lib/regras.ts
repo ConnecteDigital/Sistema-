@@ -10,10 +10,14 @@ export type SiteResumo = {
   situacao: string; motivo: string | null; telefones: string[]; whatsapps: string[];
   tagGoogle: string | null; tagsAw: string[]; tagsGtm: string[];
 };
-export type EntradaLead = { dominio: string; regioes: PresencaRegiao[]; site: SiteResumo | null };
+export type EntradaLead = {
+  dominio: string; regioes: PresencaRegiao[]; site: SiteResumo | null;
+  cnpjs?: string[]; razaoSocial?: string | null;      // da consulta de CNPJ (só dígitos)
+};
 export type Contexto = {
   dominiosPorTelefone: Map<string, Set<string>>;   // numero → domínios que divulgam
   dominiosPorTag: Map<string, Set<string>>;        // AW-/GTM- → domínios
+  dominiosPorCnpj: Map<string, Set<string>>;       // CNPJ (dígitos) → domínios
 };
 export type SaidaLead = {
   prioridade: Prioridade; telefonePrincipal: string | null; outrosTelefones: string[];
@@ -24,9 +28,12 @@ const PESO: Record<Prioridade, number> = { "Máxima": 0, Alta: 1, Normal: 2, Bai
 export const ordemPrioridade = (p: string) => PESO[p as Prioridade] ?? 9;
 
 /** Monta os índices de telefone/tag → domínios a partir das últimas verificações de site. */
-export function montarContexto(sites: { dominio: string; site: SiteResumo }[]): Contexto {
+export function montarContexto(
+  sites: { dominio: string; site: SiteResumo }[], cnpjs: { dominio: string; cnpjs: string[] }[] = [],
+): Contexto {
   const dominiosPorTelefone = new Map<string, Set<string>>();
   const dominiosPorTag = new Map<string, Set<string>>();
+  const dominiosPorCnpj = new Map<string, Set<string>>();
   const add = (m: Map<string, Set<string>>, k: string, d: string) => { if (!m.has(k)) m.set(k, new Set()); m.get(k)!.add(d); };
   for (const { dominio, site } of sites) {
     for (const t of [...site.telefones, ...site.whatsapps]) {
@@ -35,7 +42,8 @@ export function montarContexto(sites: { dominio: string; site: SiteResumo }[]): 
     }
     for (const tag of [...site.tagsAw, ...site.tagsGtm]) add(dominiosPorTag, tag, dominio);
   }
-  return { dominiosPorTelefone, dominiosPorTag };
+  for (const c of cnpjs) for (const n of c.cnpjs) add(dominiosPorCnpj, n, c.dominio);
+  return { dominiosPorTelefone, dominiosPorTag, dominiosPorCnpj };
 }
 
 export function avaliarLead(e: EntradaLead, ctx: Contexto): SaidaLead {
@@ -74,6 +82,13 @@ export function avaliarLead(e: EntradaLead, ctx: Contexto): SaidaLead {
   }
   for (const tag of [...(s?.tagsAw ?? []), ...(s?.tagsGtm ?? [])]) {
     for (const d of ctx.dominiosPorTag.get(tag) ?? []) if (d !== e.dominio) mesmoDono.add(d);
+  }
+  // Mesmo CNPJ em outros sites = mesmo dono, com certeza
+  const mesmoCnpj = new Set<string>();
+  for (const c of e.cnpjs ?? []) for (const d of ctx.dominiosPorCnpj.get(c) ?? []) if (d !== e.dominio) mesmoCnpj.add(d);
+  if (mesmoCnpj.size) {
+    obs.push(`Mesmo CNPJ${e.razaoSocial ? ` (${e.razaoSocial})` : ""} que ${[...mesmoCnpj].slice(0, 4).join(", ")}: mesmo dono, ligar uma vez só.`);
+    mesmoCnpj.forEach((d) => mesmoDono.delete(d));
   }
   if (mesmoDono.size && !baixa) obs.push(`Mesmo dono que ${[...mesmoDono].slice(0, 3).join(", ")}: ligar uma vez só.`);
 

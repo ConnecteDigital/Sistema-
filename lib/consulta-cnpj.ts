@@ -1,6 +1,7 @@
 import "server-only";
 import { cnpjValido, formatarCnpj, soDigitos } from "./cnpj";
 import { baixarPagina, analisarPagina } from "./site";
+import { db } from "./supabase";
 
 // Consulta sob demanda (botão "Consultar CNPJ"). Fontes públicas e gratuitas:
 // 1) Registro.br (RDAP): titular de domínios .br — traz CNPJ quando o dono é empresa.
@@ -77,14 +78,38 @@ async function dadosCnpjWs(cnpj: string): Promise<DadosEmpresa | null> {
   };
 }
 
+const CACHE_DIAS = 90;
+
+/** Dados da Receita com cache no banco: o mesmo CNPJ não é consultado de novo por 90 dias. */
 async function dadosEmpresa(cnpj: string, avisos: string[]): Promise<DadosEmpresa | null> {
-  try { const d = await dadosBrasilApi(cnpj); if (d) return d; }
-  catch (e) { avisos.push(String(e instanceof Error ? e.message : e)); }
-  try { return await dadosCnpjWs(cnpj); }
-  catch (e) { avisos.push(String(e instanceof Error ? e.message : e)); return null; }
+  const { data: cache } = await db().from("empresas_cnpj").select("dados, consultado_em").eq("cnpj", cnpj).maybeSingle();
+  if (cache && Date.now() - new Date(cache.consultado_em).getTime() < CACHE_DIAS * 86_400_000) {
+    return (cache.dados as DadosEmpresa | null) ?? null;
+  }
+  let dados: DadosEmpresa | null = null;
+  let falhou = false;
+  try { dados = await dadosBrasilApi(cnpj); }
+  catch (e) { falhou = true; avisos.push(String(e instanceof Error ? e.message : e)); }
+  if (!dados) {
+    try { dados = await dadosCnpjWs(cnpj); falhou = false; }
+    catch (e) { falhou = true; avisos.push(String(e instanceof Error ? e.message : e)); }
+  }
+  // só guarda no cache quando a consulta respondeu (achou ou "não existe"); erro de rede tenta de novo depois
+  if (!falhou || dados) {
+    await db().from("empresas_cnpj").upsert({ cnpj, dados, consultado_em: new Date().toISOString() }, { onConflict: "cnpj" });
+  }
+  return dados;
 }
 
-export async function consultarCnpjDoSite(dominio: string, linkAnuncio: string | null): Promise<ResultadoCnpj> {
+export type OpcoesConsulta = {
+  /** CNPJs já achados na verificação automática do site: evita baixar o site de novo. */
+  cnpjsDoSite?: string[] | null;
+  /** Procurar também em /contato, /politica-de-privacidade… (consulta manual). */
+  paginasExtras?: boolean;
+};
+
+export async function consultarCnpjDoSite(dominio: string, linkAnuncio: string | null, opcoes: OpcoesConsulta = {}): Promise<ResultadoCnpj> {
+  const paginasExtras = opcoes.paginasExtras ?? true;
   const avisos: string[] = [];
   const origens = new Map<string, Set<string>>();
   const anotar = (cnpj: string, origem: string) => {
@@ -107,16 +132,17 @@ export async function consultarCnpjDoSite(dominio: string, linkAnuncio: string |
   }
 
   // 2) Site: página do anúncio, home e páginas comuns de contato
+  if (opcoes.cnpjsDoSite) for (const c of opcoes.cnpjsDoSite) anotar(c, "Site");
   const urls = [...new Set([linkAnuncio, `https://${dominio}/`, `https://www.${dominio}/`].filter(Boolean) as string[])];
-  let algumaAbriu = false;
-  for (const url of urls) {
+  let algumaAbriu = !!opcoes.cnpjsDoSite;
+  for (const url of opcoes.cnpjsDoSite ? [] : urls) {
     const p = await baixarPagina(url, 12_000);
     if (!p.html) continue;
     algumaAbriu = true;
     for (const c of analisarPagina(p).cnpjs) anotar(c, "Site");
     if (origens.size) break;
   }
-  if (!origens.size && algumaAbriu) {
+  if (!origens.size && algumaAbriu && paginasExtras) {
     for (const caminho of ["/contato", "/politica-de-privacidade", "/sobre", "/quem-somos"]) {
       const p = await baixarPagina(`https://${dominio}${caminho}`, 8_000);
       if (p.ok) for (const c of analisarPagina(p).cnpjs) anotar(c, `Site (${caminho})`);

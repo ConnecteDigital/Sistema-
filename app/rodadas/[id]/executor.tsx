@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 type Progresso = {
   status: string; total: number; feitas: number; erros: number; anunciantes: number; erro: string | null; terminou: boolean;
-  sitesTotal: number; sitesVerificados: number;
+  sitesTotal: number; sitesVerificados: number; cnpjTotal: number; cnpjFeitos: number;
 };
 
 /** Chama /work em sequência até a rodada terminar, atualizando a tela a cada lote. */
@@ -59,23 +59,29 @@ export function Executor({ runId, inicial, semLeads }: { runId: number; inicial:
     if (!semLeads) return null;
     return (
       <div className="cartao flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
-        <span>Esta rodada foi feita antes da verificação de sites. Quer verificar os sites e gerar os leads agora? (grátis)</span>
-        <button onClick={verificarSites} className="botao">Verificar sites</button>
+        <span>Faltam dados nesta rodada (leads, prioridade ou CNPJ). Quer completar agora? É grátis, não gasta crédito da SerpApi.</span>
+        <button onClick={verificarSites} className="botao">Completar leads e CNPJs</button>
       </div>
     );
   }
   const verificando = p.status === "verificando";
-  const pct = verificando
-    ? (p.sitesTotal ? Math.round((p.sitesVerificados / p.sitesTotal) * 100) : 0)
-    : (p.total ? Math.round(((p.feitas + p.erros) / p.total) * 100) : 0);
+  const etapaCnpj = verificando && p.sitesTotal > 0 && p.sitesVerificados >= p.sitesTotal;
+  const pct = etapaCnpj
+    ? (p.cnpjTotal ? Math.round((p.cnpjFeitos / p.cnpjTotal) * 100) : 0)
+    : verificando
+      ? (p.sitesTotal ? Math.round((p.sitesVerificados / p.sitesTotal) * 100) : 0)
+      : (p.total ? Math.round(((p.feitas + p.erros) / p.total) * 100) : 0);
   return (
     <div className="cartao space-y-3 p-4">
       <div className="flex items-center justify-between text-sm">
         <span className="font-medium">
-          {rodando ? (verificando ? "Verificando os sites dos anunciantes…" : "Buscando anúncios…") : p.erro ? "Parada" : "Pausada"}
+          {rodando
+            ? (etapaCnpj ? "Etapa 3 de 3 · Consultando CNPJs…" : verificando ? "Etapa 2 de 3 · Verificando os sites…" : "Etapa 1 de 3 · Buscando anúncios…")
+            : p.erro ? "Parada" : "Pausada"}
         </span>
         <span className="tabular-nums text-suave">
-          {verificando ? `${p.sitesVerificados} / ${p.sitesTotal || "?"} sites` : `${p.feitas + p.erros} / ${p.total} buscas`} · {pct}%
+          {etapaCnpj ? `${p.cnpjFeitos} / ${p.cnpjTotal} CNPJs`
+            : verificando ? `${p.sitesVerificados} / ${p.sitesTotal || "?"} sites` : `${p.feitas + p.erros} / ${p.total} buscas`} · {pct}%
         </span>
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-slate-100">
