@@ -5,6 +5,7 @@ import { formatarData } from "@/lib/utils";
 import { ConsultaCnpj } from "@/components/consulta-cnpj";
 import { COR_FORCA, COR_PRIORIDADE, ROTULO_SITUACAO, ROTULO_TAG, linkWhats } from "@/components/selos";
 import { CampoData, CampoNotas, CampoResponsavel, CampoStatus } from "../campos";
+import { OutrosDominios } from "./outros-dominios";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Lead" };
@@ -16,7 +17,7 @@ export default async function Lead({ params }: { params: Promise<{ id: string }>
   if (!lead) notFound();
   const adv = lead.advertisers as { id: number; dominio: string; nome: string | null; primeiro_visto: string; ultimo_visto: string };
 
-  const [historico, site, cnpj, eventos, equipe] = await Promise.all([
+  const [historico, site, cnpj, eventos, equipe, outros] = await Promise.all([
     db().from("run_advertisers")
       .select("run_id, presenca, aparicoes, buscas, forca, pos_media, pct_topo, pct_sitelinks, titulo, link, pontos, termos, regions(nome), runs(criado_em)")
       .eq("advertiser_id", adv.id).order("run_id", { ascending: false }).limit(50),
@@ -24,6 +25,7 @@ export default async function Lead({ params }: { params: Promise<{ id: string }>
     db().from("consultas_cnpj").select("resultado, consultado_em").eq("advertiser_id", adv.id).maybeSingle(),
     db().from("lead_events").select("tipo, texto, criado_em").eq("lead_id", id).order("criado_em", { ascending: false }).limit(50),
     db().from("equipe").select("id, nome").eq("ativo", true).order("nome"),
+    db().from("lead_dominios").select("dominio, resultado, consultado_em").eq("lead_id", id).order("consultado_em", { ascending: false }),
   ]);
   type H = { run_id: number; presenca: number; aparicoes: number; buscas: number; forca: string; pos_media: number | null;
     pct_topo: number; pct_sitelinks: number; titulo: string | null; link: string | null; pontos: string[]; termos: string[];
@@ -72,6 +74,8 @@ export default async function Lead({ params }: { params: Promise<{ id: string }>
           <CampoNotas id={id} valor={lead.notas} />
         </section>
       </div>
+
+      <OutrosDominios leadId={id} itens={outros.data ?? []} />
 
       {lead.observacoes?.length > 0 && (
         <section className="cartao p-4 text-sm">
