@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/supabase";
 
-const STATUS = ["A contatar", "Contatado", "Respondeu", "Reunião marcada", "Proposta enviada", "Fechado", "Sem interesse", "Descartado"];
+import { STATUS_LEAD } from "@/lib/status";
+const STATUS: readonly string[] = STATUS_LEAD;
 
 export async function atualizarLead(id: number, campo: "status" | "responsavel_id" | "data_contato" | "notas", valor: string) {
   let v: string | number | null = valor.trim() || null;

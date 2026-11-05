@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { atualizarLead } from "./actions";
 
-export const STATUS = ["A contatar", "Contatado", "Respondeu", "Reunião marcada", "Proposta enviada", "Fechado", "Sem interesse", "Descartado"];
+import { STATUS_LEAD as STATUS } from "@/lib/status";
 
 function useSalvar(id: number) {
   const [salvando, iniciar] = useTransition();

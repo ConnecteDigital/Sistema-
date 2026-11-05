@@ -2,7 +2,8 @@ import Link from "next/link";
 import { db } from "@/lib/supabase";
 import { ordemPrioridade } from "@/lib/regras";
 import { COR_FORCA, COR_PRIORIDADE, linkWhats } from "@/components/selos";
-import { CampoData, CampoResponsavel, CampoStatus, STATUS } from "./campos";
+import { CampoData, CampoResponsavel, CampoStatus } from "./campos";
+import { STATUS_LEAD as STATUS } from "@/lib/status";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Leads" };
