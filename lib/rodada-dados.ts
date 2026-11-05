@@ -3,6 +3,8 @@ import { db } from "./supabase";
 import { agruparDonos } from "./grupos";
 import type { ResultadoCnpj } from "./consulta-cnpj";
 import type { Linha } from "./linha";
+import { combinarRodadas, type LinhaRodada } from "./combinar";
+import { lerSettings } from "./motor";
 
 export type { Linha } from "./linha";
 
@@ -17,10 +19,7 @@ export async function buscarLinhasBanco(runId: number): Promise<LinhaBanco[]> {
   return (sem.data ?? []) as unknown as LinhaBanco[];
 }
 
-export type LinhaBanco = { id: number; advertiser_id: number; aparicoes: number; buscas: number; presenca: number; pontos: string[]; termos: string[];
-  pos_media: number | null; pct_topo: number; pct_sitelinks: number; titulo: string | null; link: string | null;
-  forca: string; nome: string | null; duplicado_mesma_busca: number; termo_no_site?: boolean | null; termos_ausentes?: string[];
-  advertisers: { dominio: string; nome: string | null }; regions: { nome: string } };
+export type LinhaBanco = LinhaRodada;
 
 /** Junta anunciantes da rodada com lead, site e CNPJ, e agrupa por dono. */
 export async function montarLinhas(listaA: LinhaBanco[], pronta: boolean): Promise<Linha[]> {
@@ -53,6 +52,7 @@ export async function montarLinhas(listaA: LinhaBanco[], pronta: boolean): Promi
     statusLead: leadPor.get(a.advertiser_id)?.status ?? null,
     grupo: a.advertiser_id,
     termoNoSite: a.termo_no_site ?? null, termosAusentes: a.termos_ausentes ?? [],
+    porRodada: a.por_rodada,
   }));
   const grupos = agruparDonos([...new Map(linhas.map((l) => [l.advertiserId, l])).values()].map((l) => ({
     id: l.advertiserId, cnpjs: l.cnpjs, telefones: [l.telefone, ...l.outrosTelefones].filter((t): t is string => !!t), tags: l.tags,
@@ -67,4 +67,20 @@ export async function carregarRodada(id: number) {
   if (!run) return null;
   const linhas = await montarLinhas(await buscarLinhasBanco(id), run.status === "pronta");
   return { run, linhas };
+}
+
+export type InfoRodada = { id: number; criado_em: string; termos: string[]; status: string; total_buscas: number };
+
+/** Várias rodadas num relatório só: um anunciante por região, presença somada e comparação entre horários. */
+export async function carregarRodadas(ids: number[]) {
+  const unicos = [...new Set(ids)].filter(Number.isInteger).sort((a, b) => a - b);
+  const { data: runs } = await db().from("runs").select("id, criado_em, termos, status, total_buscas").in("id", unicos);
+  const infos = ((runs ?? []) as InfoRodada[]).sort((a, b) => a.id - b.id);
+  if (!infos.length) return null;
+  const porRodada = await Promise.all(infos.map(async (r) => ({ rodada: r.id, linhas: await buscarLinhasBanco(r.id) })));
+  const linhasBanco = infos.length === 1
+    ? porRodada[0].linhas
+    : combinarRodadas(porRodada, (await lerSettings()).limites);
+  const linhas = await montarLinhas(linhasBanco, infos.every((r) => r.status === "pronta"));
+  return { runs: infos, linhas };
 }

@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { db } from "@/lib/supabase";
-import { carregarRodada } from "@/lib/rodada-dados";
+import { carregarRodadas, type InfoRodada } from "@/lib/rodada-dados";
+import { comparar, type Comparacao } from "@/lib/combinar";
 import { montarDonos } from "@/lib/donos";
 import { donosParaContatos } from "@/lib/exportar";
 import { formatarData } from "@/lib/utils";
 import { RelatorioLigacao } from "../rodadas/[id]/relatorio";
-import { SeletorRodada } from "./seletor";
+import { SeletorRodadas } from "./seletor";
 import type { Linha } from "@/lib/linha";
 
 export const dynamic = "force-dynamic";
@@ -39,8 +40,13 @@ function Barras({ titulo, itens, total, unidade }: {
   );
 }
 
-export default async function Relatorios({ searchParams }: { searchParams: Promise<{ rodada?: string }> }) {
-  const { rodada } = await searchParams;
+const ROTULO_COMP: Record<Comparacao, string> = {
+  todas: "apareceram em todas", so_primeira: "só na primeira", so_ultima: "só na última (novos)",
+  sumiu: "sumiram depois", caiu: "caíram 30+ pontos", subiu: "subiram 30+ pontos",
+};
+
+export default async function Relatorios({ searchParams }: { searchParams: Promise<{ rodada?: string; rodadas?: string; so?: string }> }) {
+  const { rodada, rodadas: rodadasParam, so } = await searchParams;
   const { data: rodadas } = await db().from("runs").select("id, criado_em, termos, status")
     .eq("status", "pronta").order("id", { ascending: false }).limit(50);
   const lista = rodadas ?? [];
@@ -52,14 +58,24 @@ export default async function Relatorios({ searchParams }: { searchParams: Promi
       </main>
     );
   }
-  const id = Number(rodada) || lista[0].id;
-  const dados = await carregarRodada(id);
-  return <ConteudoRelatorio id={id} lista={lista} linhas={dados?.linhas ?? []} />;
+  const ids = (rodadasParam ?? "").split(",").map(Number).filter(Boolean);
+  const escolhidas = ids.length ? ids : [Number(rodada) || lista[0].id];
+  const dados = await carregarRodadas(escolhidas);
+  return <ConteudoRelatorio lista={lista} runs={dados?.runs ?? []} todas={dados?.linhas ?? []}
+    so={so && so in ROTULO_COMP ? (so as Comparacao) : null} />;
 }
 
-export function ConteudoRelatorio({ id, lista, linhas }: {
-  id: number; lista: { id: number; criado_em: string; termos: unknown }[]; linhas: Linha[];
+export function ConteudoRelatorio({ lista, runs, todas, so }: {
+  lista: { id: number; criado_em: string; termos: unknown }[]; runs: InfoRodada[]; todas: Linha[]; so: Comparacao | null;
 }) {
+  const id = runs[runs.length - 1]?.id ?? lista[0].id;
+  const varias = runs.length > 1;
+  const qs = varias ? `rodadas=${runs.map((r) => r.id).join(",")}` : `rodada=${id}`;
+  const linhas = so ? todas.filter((l) => comparar(l.porRodada ?? []).includes(so)) : todas;
+  // comparação por site (uma vez por anunciante, na região onde é mais forte)
+  const sitesTodos = [...new Map([...todas].sort((a, b) => a.presenca - b.presenca).map((l) => [l.advertiserId, l])).values()];
+  const contaComp = (c: Comparacao) => sitesTodos.filter((l) => comparar(l.porRodada ?? []).includes(c)).length;
+  const hora = (iso: string) => new Date(iso).toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
   const donos = montarDonos(linhas);
 
   // --- números ---
@@ -82,17 +98,19 @@ export function ConteudoRelatorio({ id, lista, linhas }: {
 
   const rotulo = (r: { id: number; criado_em: string; termos: unknown }) =>
     `#${r.id} · ${formatarData(r.criado_em)} · ${(r.termos as string[]).join(", ")}`;
-  const exp = (formato: string, quem: string) => `/api/runs/${id}/exportar?formato=${formato}&quem=${quem}`;
+  const exp = (formato: string, quem: string) =>
+    `/api/runs/${id}/exportar?formato=${formato}&quem=${quem}${varias ? `&rodadas=${runs.map((r) => r.id).join(",")}` : ""}${so ? `&so=${so}` : ""}`;
 
   return (
     <main className="mx-auto max-w-6xl space-y-5 p-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="space-y-1">
           <h1 className="text-xl font-semibold">Relatórios</h1>
-          <SeletorRodada atual={id} rodadas={lista.map((r) => ({ id: r.id, rotulo: rotulo(r) }))} />
+          <SeletorRodadas atuais={runs.map((r) => r.id)} rodadas={lista.map((r) => ({ id: r.id, rotulo: rotulo(r) }))} />
           <p className="text-xs text-suave">
-            {[...new Set(linhas.map((l) => l.regiao))].join(", ")} · {sites.length} sites · {donos.length} donos ·{" "}
-            <Link href={`/rodadas/${id}`} className="text-marca hover:underline">abrir a rodada</Link>
+            {[...new Set(linhas.map((l) => l.regiao))].join(", ")} · {sites.length} sites · {donos.length} donos
+            {varias ? ` · ${runs.length} rodadas juntas, sem repetir anunciante` : ""}
+            {!varias && <> · <Link href={`/rodadas/${id}`} className="text-marca hover:underline">abrir a rodada</Link></>}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -108,6 +126,54 @@ export function ConteudoRelatorio({ id, lista, linhas }: {
           </details>
         </div>
       </div>
+
+      {varias && (
+        <section className="cartao space-y-3 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-semibold">Comparação de horários</h2>
+            <p className="text-xs text-suave">{runs.map((r) => `#${r.id} às ${hora(r.criado_em)}`).join(" → ")}</p>
+          </div>
+          <div className="flex flex-wrap gap-2 text-sm">
+            <Link href={`/relatorios?${qs}`} className={`rounded-lg border px-3 py-1.5 ${!so ? "border-marca bg-blue-50 text-marca" : "border-borda"}`}>
+              Todos <strong>{sitesTodos.length}</strong>
+            </Link>
+            {(Object.keys(ROTULO_COMP) as Comparacao[]).map((c) => (
+              <Link key={c} href={`/relatorios?${qs}&so=${c}`}
+                className={`rounded-lg border px-3 py-1.5 ${so === c ? "border-marca bg-blue-50 text-marca" : "border-borda"} ${c === "sumiu" || c === "caiu" ? "font-medium" : ""}`}>
+                {ROTULO_COMP[c]} <strong>{contaComp(c)}</strong>
+              </Link>
+            ))}
+          </div>
+          <p className="text-xs text-suave">
+            <strong>Sumiram depois / caíram</strong> = apareciam no primeiro horário e quase não aparecem no último: provável verba acabando cedo
+            (argumento: &quot;seu anúncio some à tarde&quot;). A lista abaixo e a exportação seguem o filtro escolhido.
+          </p>
+          <div className="max-h-80 overflow-auto">
+            <table className="w-full min-w-[560px] text-sm">
+              <thead className="sticky top-0 bg-white text-left text-xs uppercase text-suave">
+                <tr className="border-b border-borda"><th className="py-1.5 pr-3">Site</th>
+                  {runs.map((r) => <th key={r.id} className="pr-3 text-right">#{r.id} {hora(r.criado_em)}</th>)}<th>Comportamento</th></tr>
+              </thead>
+              <tbody>
+                {[...new Map(linhas.map((l) => [l.advertiserId, l])).values()]
+                  .sort((a, b) => (b.porRodada?.[0]?.presenca ?? 0) - (b.porRodada?.at(-1)?.presenca ?? 0) - ((a.porRodada?.[0]?.presenca ?? 0) - (a.porRodada?.at(-1)?.presenca ?? 0)))
+                  .map((l) => (
+                    <tr key={l.advertiserId} className="border-b border-borda last:border-0">
+                      <td className="py-1.5 pr-3">{l.leadId ? <Link href={`/leads/${l.leadId}`} className="hover:underline">{l.razaoSocial ?? l.nome ?? l.dominio}</Link> : l.dominio}
+                        <span className="block text-[11px] text-suave">{l.dominio}</span></td>
+                      {(l.porRodada ?? []).map((p) => (
+                        <td key={p.rodada} className={`pr-3 text-right tabular-nums ${p.presenca === 0 ? "text-red-600" : ""}`}>
+                          {p.presenca === null ? "—" : `${Math.round(p.presenca * 100)}%`}
+                        </td>
+                      ))}
+                      <td className="text-xs">{comparar(l.porRodada ?? []).filter((c) => c !== "todas").map((c) => ROTULO_COMP[c]).join(", ") || "estável"}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {/* Números principais */}
       <div className="grid grid-cols-2 gap-2 md:grid-cols-6">

@@ -4,6 +4,7 @@ import { progresso } from "@/lib/motor";
 import { formatarData } from "@/lib/utils";
 import { Executor } from "./executor";
 import { BotoesRepetir } from "@/components/botoes-repetir";
+import { AgendarRodada } from "@/components/agendar-rodada";
 import { TabelaAnunciantes } from "./tabela";
 import { RelatorioLigacao } from "./relatorio";
 import { buscarLinhasBanco, montarLinhas } from "@/lib/rodada-dados";
@@ -18,12 +19,13 @@ export default async function Rodada({ params, searchParams }: { params: Promise
   const { data: run } = await db().from("runs").select("*").eq("id", id).maybeSingle();
   if (!run) notFound();
 
-  const [prog, anunc, buscas] = await Promise.all([
+  const [prog, anunc, buscas, agenda] = await Promise.all([
     progresso(id),
     buscarLinhasBanco(id),
     db().from("run_searches")
       .select("id, termo, status, qtd_anuncios, erro, location_usada, locations(nome_exibicao, regions(nome))")
       .eq("run_id", id).order("id").limit(5000),
+    db().from("schedules").select("horarios, dias, ativo, ultimo_erro").eq("rodada_origem", id).maybeSingle(),
   ]);
 
   const linhas = await montarLinhas(anunc, prog.status === "pronta");
@@ -48,6 +50,7 @@ export default async function Rodada({ params, searchParams }: { params: Promise
         </div>
         <BotoesRepetir rodada={id} criadaEm={run.criado_em} />
       </div>
+      <AgendarRodada rodada={id} inicial={agenda.error ? null : agenda.data ?? null} />
       {erroRepetir && <p className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">Não deu para repetir: {erroRepetir}</p>}
 
       <Executor runId={id} inicial={prog} semLeads={semLeads} />

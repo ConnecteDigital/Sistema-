@@ -10,6 +10,7 @@ export const metadata: Metadata = {
 const links = [
   { href: "/", rotulo: "Nova pesquisa" },
   { href: "/rodadas", rotulo: "Rodadas" },
+  { href: "/agendamentos", rotulo: "Agendamentos" },
   { href: "/leads", rotulo: "Leads" },
   { href: "/relatorios", rotulo: "Relatórios" },
   { href: "/disparos", rotulo: "Disparos" },

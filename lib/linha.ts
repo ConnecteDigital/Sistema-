@@ -10,4 +10,5 @@ export type Linha = {
   cnpj: CnpjSalvo; cnpjPrincipal: string | null; razaoSocial: string | null; cnpjs: string[];
   tags: string[]; statusLead: string | null; grupo: number;
   termoNoSite: boolean | null; termosAusentes: string[];
+  porRodada?: { rodada: number; presenca: number | null }[];   // só no relatório de várias rodadas
 };
