@@ -3,11 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import type { ResumoContas } from "@/lib/contas-ads";
 
-type Estado = { status: string; resultado?: ResumoContas | null; erro?: string | null; consultado_em?: string; etapa?: number };
+type Estado = { status: string; resultado?: ResumoContas | null; erro?: string | null; consultado_em?: string; etapa?: number; diag?: unknown };
 
 const data = (iso: string | null) => (iso ? iso.slice(0, 10).split("-").reverse().join("/") : "—");
 
-export function ContaGoogleAds({ advertiserId, inicial }: { advertiserId: number; inicial: Estado | null }) {
+export function ContaGoogleAds({ advertiserId, dominio, inicial }: { advertiserId: number; dominio: string; inicial: Estado | null }) {
   const [e, setE] = useState<Estado | null>(inicial);
   const [falha, setFalha] = useState<string | null>(null);
   const vivo = useRef(true);
@@ -48,8 +48,30 @@ export function ContaGoogleAds({ advertiserId, inicial }: { advertiserId: number
         <span className="text-[11px] text-suave">Quem paga o anúncio, não quem registrou o domínio. Usa a DataForSEO (centavos).</span>
       </div>
       {(falha || e?.erro) && <p className="text-xs text-red-600">{falha ?? e?.erro}</p>}
+      <p className="text-[11px]">
+        <a href={`https://adstransparency.google.com/?region=BR&domain=${encodeURIComponent(dominio)}`} target="_blank" rel="noreferrer"
+          className="text-marca hover:underline">Conferir este domínio direto na Central de Transparência do Google →</a>
+      </p>
       {e?.status === "pronta" && res && res.contas.length === 0 && (
-        <p className="text-xs text-suave">Nenhuma conta encontrada para este domínio na Central de Transparência (o Google não lista todos).</p>
+        <div className="space-y-1 text-xs">
+          <p className="text-suave">
+            A Central de Transparência não ligou nenhuma conta a este domínio (o Google não lista todos os anunciantes, e a
+            DataForSEO pode estar desatualizada). Use o link acima para conferir no site do Google.
+          </p>
+          {res.parecidas && res.parecidas.length > 0 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-2">
+              <p className="font-medium">Contas com nome parecido com &quot;{res.buscaNome}&quot; (conferir, não é certeza):</p>
+              {res.parecidas.map((p) => (
+                <p key={p.advertiserId}>
+                  <a href={`https://adstransparency.google.com/advertiser/${p.advertiserId}?region=BR`} target="_blank" rel="noreferrer"
+                    className="text-marca hover:underline">{p.nome ?? p.advertiserId}</a>
+                  {p.local && ` · ${p.local}`}{p.anuncios !== null && ` · ~${p.anuncios} anúncios`}{p.verificado && " · verificado"}
+                </p>
+              ))}
+            </div>
+          )}
+          {res.parecidas && res.parecidas.length === 0 && <p className="text-suave">A busca pelo nome &quot;{res.buscaNome}&quot; também não achou contas.</p>}
+        </div>
       )}
       {res?.contas.map((c) => (
         <div key={c.advertiserId} className="space-y-0.5 rounded-lg border border-borda bg-slate-50 p-3 text-xs">
@@ -79,6 +101,12 @@ export function ContaGoogleAds({ advertiserId, inicial }: { advertiserId: number
           <strong>Outros sites do mesmo anunciante:</strong> {res.outrosSites.join(", ")}
           <span className="block text-suave">Dica: consulte o dono deles em &quot;Outros sites deste dono&quot;, aqui embaixo.</span>
         </p>
+      )}
+      {e?.status === "pronta" && e.diag != null && (
+        <details className="text-[11px] text-suave">
+          <summary className="cursor-pointer">Resposta da DataForSEO (para conferência)</summary>
+          <pre className="mt-1 max-h-64 overflow-auto rounded bg-slate-100 p-2">{JSON.stringify(e.diag, null, 2)}</pre>
+        </details>
       )}
     </div>
   );

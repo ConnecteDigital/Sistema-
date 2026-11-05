@@ -27,7 +27,7 @@ export default async function Lead({ params }: { params: Promise<{ id: string }>
     db().from("lead_events").select("tipo, texto, criado_em").eq("lead_id", id).order("criado_em", { ascending: false }).limit(50),
     db().from("equipe").select("id, nome").eq("ativo", true).order("nome"),
     db().from("lead_dominios").select("dominio, resultado, consultado_em").eq("lead_id", id).order("consultado_em", { ascending: false }),
-    db().from("contas_google_ads").select("status, resultado, erro, consultado_em").eq("advertiser_id", adv.id).maybeSingle(),
+    db().from("contas_google_ads").select("status, resultado, erro, consultado_em, bruto").eq("advertiser_id", adv.id).maybeSingle(),
   ]);
   type H = { run_id: number; presenca: number; aparicoes: number; buscas: number; forca: string; pos_media: number | null;
     pct_topo: number; pct_sitelinks: number; titulo: string | null; link: string | null; pontos: string[]; termos: string[];
@@ -71,7 +71,7 @@ export default async function Lead({ params }: { params: Promise<{ id: string }>
         <h2 className="font-semibold">Conta do Google Ads (quem paga o anúncio)</h2>
         {perfil
           ? <p className="text-xs text-suave">Sem site: procure o nome na <a href="https://adstransparency.google.com/?region=BR" target="_blank" rel="noreferrer" className="text-marca hover:underline">Central de Transparência</a>.</p>
-          : <ContaGoogleAds advertiserId={adv.id} inicial={contaAds.data ?? null} />}
+          : <ContaGoogleAds advertiserId={adv.id} dominio={adv.dominio} inicial={contaAds.data ? { ...contaAds.data, diag: (contaAds.data as { bruto?: { diag?: unknown } }).bruto?.diag ?? null } : null} />}
       </section>
 
       <div className="grid gap-4 md:grid-cols-2">
