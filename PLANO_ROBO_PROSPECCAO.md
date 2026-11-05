@@ -276,6 +276,8 @@ Autenticação Basic (login:senha da API). Endpoints testados:
 
 **Não usar DataForSEO** para descobrir anunciantes ao vivo, nem Maps.
 
+**Revisão 5 — Conta do Google Ads no lead:** o registrante do domínio muitas vezes não é o dono (gestor, parente, agência). No detalhe do lead, o botão "Ver conta do Google Ads (Transparência)" roda `ads_search` pelo domínio (etapa 1: descobre `advertiser_id` e nome verificado) e depois pelos `advertiser_ids` (etapa 2: outros sites da mesma conta). Resultado em `contas_google_ads` (resumo + resposta bruta). Nome com LTDA/ME/EIRELI… = conta em CNPJ; senão provável pessoa física.
+
 ---
 
 ## 12. Banco de dados (Supabase) — esquema *[rev. 1]*
