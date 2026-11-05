@@ -63,12 +63,10 @@ export function FormPesquisa({ dados }: { dados: Dados }) {
   const pontosCandidatos = dados.locais.filter((l) => regioesSel.has(l.region_id) && INCLUI[camada].includes(l.camada));
   const pontosFinais = pontosCandidatos.filter((l) => !pontosFora.has(l.id));
 
-  const escolherUf = (novo: string) => {
-    setUf(novo);
-    const rs = dados.regioes.filter((r) => r.uf === novo);
-    setRegioesSel(new Set(rs.length ? [rs[0].id] : []));
-    setPontosFora(new Set());
-  };
+  // Trocar de estado só muda a lista mostrada: as regiões já escolhidas (de qualquer estado) continuam
+  const escolherUf = (novo: string) => setUf(novo);
+  const selPorUf = (u: string) => dados.regioes.filter((r) => r.uf === u && regioesSel.has(r.id)).length;
+  const regioesEscolhidas = dados.regioes.filter((r) => regioesSel.has(r.id));
   const alternarRegiao = (id: number) =>
     setRegioesSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const alternarPonto = (id: number) =>
@@ -140,20 +138,36 @@ export function FormPesquisa({ dados }: { dados: Dados }) {
         <section className="cartao space-y-4 p-4">
           <h2 className="text-sm font-semibold">Área</h2>
           <select value={uf} onChange={(e) => escolherUf(e.target.value)} className="campo w-full sm:w-64">
-            <option value="">Escolha o estado…</option>
-            {ufs.map((u) => <option key={u} value={u}>{u}</option>)}
+            <option value="">{regioesSel.size ? "Adicionar região de outro estado…" : "Escolha o estado…"}</option>
+            {ufs.map((u) => <option key={u} value={u}>{u}{selPorUf(u) ? ` (${selPorUf(u)} escolhida${selPorUf(u) > 1 ? "s" : ""})` : ""}</option>)}
           </select>
 
           {uf && (
+            <div className="flex flex-wrap gap-2">
+              {regioesUf.map((r) => (
+                <button key={r.id} type="button" onClick={() => alternarRegiao(r.id)}
+                  className={`rounded-lg border px-3 py-1.5 text-sm ${regioesSel.has(r.id)
+                    ? "border-marca bg-blue-50 text-marca" : "border-borda bg-white hover:bg-slate-50"}`}>
+                  {regioesSel.has(r.id) ? "✓ " : "+ "}{r.nome}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {regioesEscolhidas.length > 0 && (
             <>
-              <div className="flex flex-wrap gap-2">
-                {regioesUf.map((r) => (
-                  <button key={r.id} type="button" onClick={() => alternarRegiao(r.id)}
-                    className={`rounded-lg border px-3 py-1.5 text-sm ${regioesSel.has(r.id)
-                      ? "border-marca bg-blue-50 text-marca" : "border-borda bg-white hover:bg-slate-50"}`}>
-                    {r.nome}
-                  </button>
-                ))}
+              <div className="rounded-lg bg-slate-50 p-2">
+                <p className="mb-1 text-xs text-suave">
+                  Regiões escolhidas ({regioesEscolhidas.length}) — troque o estado acima para adicionar de outros estados:
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {regioesEscolhidas.map((r) => (
+                    <span key={r.id} className="selo gap-1 bg-marca py-1 text-white">
+                      {r.uf} · {r.nome}
+                      <button type="button" onClick={() => alternarRegiao(r.id)} aria-label={`Tirar ${r.nome}`} className="opacity-70 hover:opacity-100">×</button>
+                    </span>
+                  ))}
+                </div>
               </div>
 
               <div className="grid grid-cols-3 gap-2">
@@ -176,7 +190,9 @@ export function FormPesquisa({ dados }: { dados: Dados }) {
                     return (
                       <div key={rid}>
                         {regioesSel.size > 1 && (
-                          <p className="mb-1 text-xs font-medium">{dados.regioes.find((r) => r.id === rid)?.nome}</p>
+                          <p className="mb-1 text-xs font-medium">
+                            {(() => { const r = dados.regioes.find((x) => x.id === rid); return r ? `${r.uf} · ${r.nome}` : ""; })()}
+                          </p>
                         )}
                         <div className="flex flex-wrap gap-1.5">
                           {ps.map((p) => (
