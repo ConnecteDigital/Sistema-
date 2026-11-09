@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { iniciarPesquisa } from "./actions";
+import { AdicionarCidade } from "./adicionar-cidade";
 
 type Nicho = { nome: string; modelos: string[] };
 type Regiao = { id: number; nome: string; uf: string; ddd: string };
@@ -83,7 +84,11 @@ export function FormPesquisa({ dados, inicial }: { dados: Dados; inicial?: Inici
   // --- Área ---
   const ufs = useMemo(() => [...new Set(dados.regioes.map((r) => r.uf))].sort(), [dados.regioes]);
   const regioesUf = dados.regioes.filter((r) => r.uf === uf);
-  const pontosCandidatos = dados.locais.filter((l) => regioesSel.has(l.region_id) && INCLUI[camada].includes(l.camada));
+  // cidades adicionadas na hora entram sempre, em qualquer tamanho
+  const [locaisExtras, setLocaisExtras] = useState<Local[]>([]);
+  const [sempre, setSempre] = useState<Set<number>>(new Set());
+  const todosLocais = [...dados.locais, ...locaisExtras.filter((x) => !dados.locais.some((l) => l.id === x.id))];
+  const pontosCandidatos = todosLocais.filter((l) => regioesSel.has(l.region_id) && (INCLUI[camada].includes(l.camada) || sempre.has(l.id)));
   const pontosFinais = pontosCandidatos.filter((l) => !pontosFora.has(l.id));
 
   // Trocar de estado só muda a lista mostrada: as regiões já escolhidas (de qualquer estado) continuam
@@ -238,6 +243,20 @@ export function FormPesquisa({ dados, inicial }: { dados: Dados; inicial?: Inici
                 </div>
               )}
             </>
+          )}
+
+          {uf && (
+            <AdicionarCidade
+              uf={uf}
+              regioes={regioesUf}
+              regiaoPadrao={regioesUf.find((r) => regioesSel.has(r.id))?.id ?? null}
+              onAdicionada={(l) => {
+                setLocaisExtras((x) => (x.some((y) => y.id === l.id) ? x : [...x, l]));
+                setSempre((x) => new Set(x).add(l.id));
+                setRegioesSel((x) => new Set(x).add(l.region_id));
+                setPontosFora((x) => { const n = new Set(x); n.delete(l.id); return n; });
+              }}
+            />
           )}
         </section>
       )}
