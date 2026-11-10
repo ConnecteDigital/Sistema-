@@ -1,4 +1,4 @@
--- 0011: Santa Catarina — Joinville, Blumenau (nova região "047 Joinville e Blumenau") e Jurerê (Florianópolis).
+-- 0012: Santa Catarina — Joinville, Blumenau (nova região "047 Joinville e Blumenau") e Jurerê (Florianópolis).
 -- Banco que já existe: Supabase → SQL Editor → New query → colar → Run. Pode rodar de novo.
 -- Depois: Configurações → "Validar locais pendentes na SerpApi (grátis)".
 
