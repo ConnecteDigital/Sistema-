@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { COR_PRIORIDADE, ROTULO_SITUACAO, linkWhats } from "@/components/selos";
 import { BotaoCopiar } from "./copiar";
+import { BotaoPdf, type ItemPdf } from "./baixar-pdf";
 import type { Linha } from "./tabela";
 
 import { montarDonos, type Dono } from "@/lib/donos";
@@ -33,11 +34,24 @@ export function RelatorioLigacao({ linhas, semResumo = false, titulo = "Relatór
     ].filter(Boolean).join("\n");
   }).join("\n\n");
 
+  const itensPdf: ItemPdf[] = ligar.map((d, i) => {
+    const a = analiseDo(d);
+    return {
+      n: i + 1, prioridade: d.prioridade, empresa: d.empresa, cnpj: d.cnpj, telefone: d.telefone,
+      sites: d.sites, regioes: d.regioes, presenca: pct(d.presenca), status: d.principal.statusLead ?? "—",
+      porQue: d.principal.observacoes.slice(0, 2), resumo: a?.resumo ?? null,
+      falar: a && !a.amostraPequena ? a.abordagem : null, cuidados: a?.cuidados ?? [],
+    };
+  });
+
   return (
     <section className="cartao space-y-4 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold">{titulo}</h2>
-        <BotaoCopiar texto={texto} />
+        <div className="flex flex-wrap gap-2">
+          <BotaoCopiar texto={texto} />
+          <BotaoPdf itens={itensPdf} titulo={titulo} />
+        </div>
       </div>
 
       {!semResumo && <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
