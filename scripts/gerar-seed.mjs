@@ -99,6 +99,11 @@ const regioes = [
     ["São José", "Sao Jose" + SC, "City", "media", 1],
     ["Palhoça", "Palhoca" + SC, "City", "ampla", 1],
     ["Biguaçu", "Biguacu" + SC, "City", "ampla", 1],
+    ["Jurerê", "Jurere" + SC, "Neighborhood", "ampla", 0],
+  ]},
+  { nome: "047 Joinville e Blumenau", uf: "SC", ddd: "47", descricao: "Norte de SC e Vale do Itajaí", pontos: [
+    ["Joinville", "Joinville" + SC, "City", "minima", 0],
+    ["Blumenau", "Blumenau" + SC, "City", "minima", 0],
   ]},
   { nome: "047 Balneário Camboriú e região", uf: "SC", ddd: "47", descricao: "Litoral norte de SC", pontos: [
     ["Balneário Camboriú", "Balneario Camboriu" + SC, "City", "minima", 1],

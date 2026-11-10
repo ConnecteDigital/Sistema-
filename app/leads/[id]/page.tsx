@@ -8,6 +8,8 @@ import { CampoData, CampoNotas, CampoResponsavel, CampoStatus } from "../campos"
 import { OutrosDominios } from "./outros-dominios";
 import { ContaGoogleAds } from "@/components/conta-google-ads";
 import { OptinWhatsApp } from "@/components/optin-whatsapp";
+import { AnaliseAnuncio } from "@/components/analise-anuncio";
+import { analisarAnuncio, rotuloForca } from "@/lib/analise";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Lead" };
@@ -38,6 +40,11 @@ export default async function Lead({ params }: { params: Promise<{ id: string }>
   const hist = (historico.data ?? []) as unknown as H[];
   const s = site.data;
   const perfil = adv.dominio.startsWith("perfil-google:");
+  const analise = analisarAnuncio(hist.map((h) => ({
+    rodada: h.run_id, data: h.runs.criado_em, regiao: h.regions.nome, presenca: Number(h.presenca), aparicoes: h.aparicoes,
+    buscas: h.buscas, posMedia: h.pos_media === null ? null : Number(h.pos_media), pctTopo: Number(h.pct_topo),
+    pontos: h.pontos ?? [], termos: h.termos ?? [],
+  })));
 
   return (
     <main className="mx-auto max-w-5xl space-y-5 p-4">
@@ -95,6 +102,13 @@ export default async function Lead({ params }: { params: Promise<{ id: string }>
 
       <OutrosDominios leadId={id} itens={outros.data ?? []} />
 
+      {analise && (
+        <section className="cartao border-l-4 border-marca p-4">
+          <h2 className="mb-2 font-semibold">Análise do anúncio</h2>
+          <AnaliseAnuncio a={analise} />
+        </section>
+      )}
+
       {lead.observacoes?.length > 0 && (
         <section className="cartao p-4 text-sm">
           <h2 className="mb-2 font-semibold">Observações (argumentos)</h2>
@@ -136,7 +150,7 @@ export default async function Lead({ params }: { params: Promise<{ id: string }>
                     <span className="block text-suave">{formatarData(h.runs.criado_em)}</span></td>
                   <td className="pr-3">{h.regions.nome}</td>
                   <td className="pr-3 text-right tabular-nums">{Math.round(Number(h.presenca) * 100)}% <span className="text-suave">({h.aparicoes}/{h.buscas})</span></td>
-                  <td className="pr-3">{h.forca}</td>
+                  <td className="pr-3">{rotuloForca(h.forca, h.buscas)}</td>
                   <td className="pr-3 text-right">{h.pos_media ? Number(h.pos_media).toFixed(1) : "—"}</td>
                   <td className="max-w-[200px] pr-3 text-suave">{h.pontos.join(", ")}</td>
                   <td className="max-w-[220px]">{h.titulo}{h.link && <a href={h.link} target="_blank" rel="noreferrer" className="block text-marca hover:underline">abrir</a>}</td>
