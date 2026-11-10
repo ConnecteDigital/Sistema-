@@ -99,3 +99,13 @@ export function pedeParaSair(texto: string | null | undefined) {
   return /^(sair|parar|pare|stop|cancelar|descadastrar|remover|nao quero|nao tenho interesse|nao me mande|para de mandar)\b/.test(t)
     || /nao tenho interesse|nao quero (mais )?receber|me (tira|tire|remova) da lista/.test(t);
 }
+
+/**
+ * Número brasileiro no formato do sistema: 55 + DDD + 9 + 8 dígitos (13 dígitos).
+ * O WhatsApp devolve muitos celulares brasileiros SEM o 9 (ex.: 557399430953); aqui o 9 volta.
+ */
+export function normalizarWaBr(n: string | null | undefined): string {
+  const d = (n ?? "").replace(/\D/g, "");
+  if (d.length === 12 && d.startsWith("55") && /[6-9]/.test(d[4])) return d.slice(0, 4) + "9" + d.slice(4);
+  return d;
+}

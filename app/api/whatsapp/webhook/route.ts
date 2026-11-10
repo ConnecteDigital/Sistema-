@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/supabase";
-import { assinaturaValida, pedeParaSair } from "@/lib/whatsapp";
+import { assinaturaValida, normalizarWaBr, pedeParaSair } from "@/lib/whatsapp";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +44,9 @@ export async function POST(req: Request) {
       await db().from("wa_mensagens").update({ status: novo }).eq("wamid", s.id);
     }
 
-    for (const m of v.messages ?? []) {
+    for (const bruto of v.messages ?? []) {
+      // o WhatsApp manda muitos celulares do Brasil sem o 9: volta para o formato do sistema
+      const m = { ...bruto, from: normalizarWaBr(bruto.from) };
       const texto = m.text?.body ?? m.button?.text ?? m.interactive?.button_reply?.title ?? m.interactive?.list_reply?.title ?? `[${m.type}]`;
       const agora = new Date().toISOString();
       const { data: contato } = await db().from("wa_contatos").select("lead_id").eq("telefone", m.from).maybeSingle();
