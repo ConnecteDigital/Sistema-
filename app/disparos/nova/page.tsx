@@ -9,7 +9,7 @@ export const metadata = { title: "Nova campanha" };
 
 export default async function Nova() {
   let modelos: Modelo[] = [], erro: string | null = null;
-  if (whatsappFaltando().length) erro = "Configure a API do WhatsApp na Vercel antes (veja a tela Disparos).";
+  if ((await whatsappFaltando()).length) erro = "Conecte o WhatsApp antes (Disparos → Conectar WhatsApp).";
   else { try { modelos = (await listarModelos()).filter((m) => m.status === "APPROVED"); } catch (e) { erro = e instanceof Error ? e.message : String(e); } }
   const [{ data: rodadas }, { data: cfg }] = await Promise.all([
     db().from("runs").select("id, criado_em, termos").eq("status", "pronta").order("id", { ascending: false }).limit(50),

@@ -12,9 +12,10 @@ const COR_QUALIDADE: Record<string, string> = { GREEN: "bg-green-100 text-green-
 const NOME_QUALIDADE: Record<string, string> = { GREEN: "Verde (boa)", YELLOW: "Amarela (atenção)", RED: "Vermelha (pare os disparos)" };
 
 export default async function Disparos() {
-  const faltando = whatsappFaltando();
+  const faltando = await whatsappFaltando();
+  const { data: conexao } = await db().from("wa_conexao").select("numero, nome, conectado_em").eq("ativo", true).order("id", { ascending: false }).limit(1).maybeSingle();
   let saude: SaudeNumero | null = null, modelos: Modelo[] = [], erroMeta: string | null = null;
-  if (!faltando.length) {
+  if (!faltando.some((f) => f.startsWith("Conectar"))) {
     try { [saude, modelos] = await Promise.all([saudeNumero(), listarModelos()]); }
     catch (e) { erroMeta = e instanceof Error ? e.message : String(e); }
   }
@@ -42,11 +43,19 @@ export default async function Disparos() {
 
       {faltando.length > 0 && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-          <p className="font-medium">Falta configurar a API do WhatsApp na Vercel:</p>
-          <ul className="mt-1 list-inside list-disc">{faltando.map((v) => <li key={v}><code>{v}</code></li>)}</ul>
-          <p className="mt-1">Opcional, recomendado: <code>WHATSAPP_APP_SECRET</code> (confere que o webhook veio da Meta).</p>
+          <p className="font-medium">Falta para o disparo funcionar:</p>
+          <ul className="mt-1 list-inside list-disc">{faltando.map((v) => <li key={v}>{v}</li>)}</ul>
         </div>
       )}
+      <div className="cartao flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
+        <div>
+          <p className="font-medium">WhatsApp conectado</p>
+          <p className="text-suave">
+            {conexao ? `${conexao.nome ?? ""} ${conexao.numero ?? ""} · desde ${formatarData(conexao.conectado_em)} · mesmo número no app do celular (coexistência)` : "Nenhum número conectado ainda."}
+          </p>
+        </div>
+        <Link href="/disparos/conectar" className={conexao ? "botao-sec" : "botao"}>{conexao ? "Reconectar" : "Conectar WhatsApp"}</Link>
+      </div>
       {erroMeta && <p className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">Erro na Meta: {erroMeta}</p>}
 
       <div className="grid gap-3 md:grid-cols-4">
