@@ -3,8 +3,15 @@ import { COR_PRIORIDADE, ROTULO_SITUACAO, linkWhats } from "@/components/selos";
 import { BotaoCopiar } from "./copiar";
 import type { Linha } from "./tabela";
 
-import { montarDonos } from "@/lib/donos";
+import { montarDonos, type Dono } from "@/lib/donos";
+import { analisarAnuncio } from "@/lib/analise";
+import { AnaliseAnuncio } from "@/components/analise-anuncio";
 const pct = (v: number) => `${Math.round(v * 100)}%`;
+const analiseDo = (d: Dono) => {
+  const l = d.principal;
+  return analisarAnuncio([{ regiao: l.regiao, presenca: l.presenca, aparicoes: l.aparicoes, buscas: l.buscas,
+    posMedia: l.pos_media, pctTopo: l.pct_topo, pontos: l.pontos ?? [], termos: l.termos ?? [] }]);
+};
 
 export function RelatorioLigacao({ linhas, semResumo = false, titulo = "Relatório — quem ligar" }: { linhas: Linha[]; semResumo?: boolean; titulo?: string }) {
   const donos = montarDonos(linhas);
@@ -14,11 +21,17 @@ export function RelatorioLigacao({ linhas, semResumo = false, titulo = "Relatór
   const gruposMultiplos = donos.filter((d) => d.sites.length > 1);
   const jaContatados = ligar.filter((d) => d.principal.statusLead && d.principal.statusLead !== "A contatar").length;
 
-  const texto = ligar.map((d, i) => [
-    `${i + 1}. [${d.prioridade}] ${d.empresa}${d.cnpj ? ` (CNPJ ${d.cnpj})` : ""}`,
-    `   ${d.telefone ?? "sem telefone"} · ${d.sites.join(", ")} · presença ${pct(d.presenca)}`,
-    d.principal.observacoes[0] ? `   ${d.principal.observacoes[0]}` : "",
-  ].filter(Boolean).join("\n")).join("\n\n");
+  const texto = ligar.map((d, i) => {
+    const a = analiseDo(d);
+    return [
+      `${i + 1}. [${d.prioridade}] ${d.empresa}${d.cnpj ? ` (CNPJ ${d.cnpj})` : ""}`,
+      `   ${d.telefone ?? "sem telefone"} · ${d.sites.join(", ")} · presença ${pct(d.presenca)}`,
+      ...d.principal.observacoes.slice(0, 2).map((o) => `   ${o}`),
+      a ? `   Anúncio: ${a.resumo}` : "",
+      a && !a.amostraPequena ? `   O que falar: "${a.abordagem}"` : "",
+      ...(a?.cuidados ?? []).map((c) => `   Cuidado: ${c}`),
+    ].filter(Boolean).join("\n");
+  }).join("\n\n");
 
   return (
     <section className="cartao space-y-4 p-4">
@@ -93,6 +106,16 @@ export function RelatorioLigacao({ linhas, semResumo = false, titulo = "Relatór
                 </td>
                 <td className="max-w-[340px] pr-3 text-xs">
                   {d.principal.observacoes.slice(0, 2).map((o) => <p key={o}>• {o}</p>)}
+                  {(() => {
+                    const a = analiseDo(d);
+                    if (!a) return null;
+                    return (
+                      <details className="mt-1">
+                        <summary className="cursor-pointer text-marca">Análise do anúncio e o que falar</summary>
+                        <div className="mt-1"><AnaliseAnuncio a={a} compacto /></div>
+                      </details>
+                    );
+                  })()}
                 </td>
                 <td className="pr-3 text-right tabular-nums">{pct(d.presenca)}<span className="block text-[11px] text-suave">{d.regioes.join(", ")}</span></td>
                 <td className="text-xs">{d.principal.statusLead ?? "—"}</td>
