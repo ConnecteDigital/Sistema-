@@ -171,3 +171,37 @@ export async function concluirEmbeddedSignup(codigo: string, wabaId: string | nu
   // Coexistência: o número já está registrado no app; NÃO chamar /register.
   return { token, wabaId: waba, phoneId: num.id, numero: num.display_phone_number ?? null, nome: num.verified_name ?? null };
 }
+
+// ---------------------------------------------------------------------------
+// Criar modelo de mensagem (vai para aprovação da Meta)
+// ---------------------------------------------------------------------------
+export type NovoModelo = {
+  nome: string; categoria: "MARKETING" | "UTILITY"; idioma: string; corpo: string; exemplos: string[];
+  rodape?: string; botaoSair?: string; botaoLigarTexto?: string; botaoLigarNumero?: string;
+};
+
+export function nomeModeloValido(n: string) {
+  return n.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 512);
+}
+
+export async function criarModelo(m: NovoModelo): Promise<{ id: string; status: string }> {
+  const c = await cfg();
+  const qtd = [...m.corpo.matchAll(/\{\{(\d+)\}\}/g)].length;
+  const components: Record<string, unknown>[] = [{
+    type: "BODY", text: m.corpo,
+    ...(qtd ? { example: { body_text: [m.exemplos.slice(0, qtd).map((e, i) => e || `exemplo ${i + 1}`)] } } : {}),
+  }];
+  if (m.rodape?.trim()) components.push({ type: "FOOTER", text: m.rodape.trim().slice(0, 60) });
+  const botoes: Record<string, unknown>[] = [];
+  if (m.botaoSair?.trim()) botoes.push({ type: "QUICK_REPLY", text: m.botaoSair.trim().slice(0, 25) });
+  if (m.botaoLigarTexto?.trim() && m.botaoLigarNumero?.replace(/\D/g, "")) {
+    const d = m.botaoLigarNumero.replace(/\D/g, "");
+    botoes.push({ type: "PHONE_NUMBER", text: m.botaoLigarTexto.trim().slice(0, 25), phone_number: `+${d.startsWith("55") ? d : "55" + d}` });
+  }
+  if (botoes.length) components.push({ type: "BUTTONS", buttons: botoes });
+  const j = await graph<{ id: string; status: string }>(`${c.wabaId}/message_templates`, {
+    method: "POST",
+    body: JSON.stringify({ name: nomeModeloValido(m.nome), language: m.idioma, category: m.categoria, components }),
+  });
+  return j;
+}

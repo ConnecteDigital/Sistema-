@@ -35,6 +35,7 @@ export default async function Disparos() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">Disparos pelo WhatsApp</h1>
         <div className="flex gap-2">
+          <Link href="/disparos/modelos" className="botao-sec">Modelos e teste</Link>
           <Link href="/disparos/conversas" className="botao-sec">Conversas</Link>
           <Link href="/disparos/nova" className="botao">Nova campanha</Link>
         </div>

@@ -68,3 +68,27 @@ export async function salvarLimites(form: FormData) {
   ], { onConflict: "chave" });
   revalidatePath("/disparos");
 }
+
+export async function criarModeloAcao(m: import("@/lib/whatsapp").NovoModelo) {
+  const { criarModelo } = await import("@/lib/whatsapp");
+  try {
+    const r = await criarModelo(m);
+    revalidatePath("/disparos");
+    return { ok: true, msg: `Modelo enviado para aprovação (status: ${r.status}). Acompanhe na tela Disparos.` };
+  } catch (e) {
+    return { ok: false, msg: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+export async function enviarTesteAcao(telefone: string, modelo: string, idioma: string, parametros: string[]) {
+  const { enviarModelo } = await import("@/lib/whatsapp");
+  const d = telefone.replace(/\D/g, "");
+  const para = d.startsWith("55") || d.length > 11 ? d : "55" + d;
+  try {
+    const wamid = await enviarModelo(para, modelo, idioma, parametros);
+    await db().from("wa_mensagens").insert({ telefone: para, direcao: "saida", tipo: "template", texto: `[teste ${modelo}] ${parametros.join(" · ")}`, wamid, status: "enviado" });
+    return { ok: true, msg: `Enviada para +${para}. Confira no WhatsApp (o status aparece em Conversas).` };
+  } catch (e) {
+    return { ok: false, msg: e instanceof Error ? e.message : String(e) };
+  }
+}
