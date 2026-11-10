@@ -1,2 +1,5 @@
 User-agent: *
+Allow: /privacidade
+Allow: /termos
+Allow: /exclusao-de-dados
 Disallow: /
