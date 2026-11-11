@@ -2,7 +2,7 @@ import { db } from "@/lib/supabase";
 import { variaveisFaltando } from "@/lib/env";
 import { formatarData } from "@/lib/utils";
 import { AvisoConfiguracao } from "@/components/aviso-configuracao";
-import { BotaoEnviar, BotaoValidarLocais, FormNovaChave } from "./formularios";
+import { BotaoCorrigirPlataformas, BotaoEnviar, BotaoValidarLocais, FormNovaChave } from "./formularios";
 import {
   adicionarNicho, adicionarPessoa, adicionarVariacao, alternarChave, removerVariacao, atualizarTodosCreditos, excluirChave, removerPessoa, salvarLimiteTroca,
 } from "./actions";
@@ -209,6 +209,15 @@ export default async function Configuracoes() {
         <p className="text-xs text-suave">
           <code>{"{termo}"}</code> é trocado pelo que você digita na pesquisa. Ex.: <code>{"{termo} 24 horas"}</code> → &quot;encanador 24 horas&quot;.
         </p>
+      </section>
+      {/* Manutenção */}
+      <section className="cartao space-y-2 p-4 sm:p-5">
+        <h2 className="font-semibold">Manutenção</h2>
+        <p className="text-sm text-suave">
+          Sites feitos em plataformas (Lovable, Vercel, Wix, Blogspot…) eram agrupados pelo domínio da plataforma, misturando empresas
+          diferentes. Este botão separa cada site, refaz as rodadas afetadas e apaga o anunciante misturado. Não gasta crédito da SerpApi.
+        </p>
+        <BotaoCorrigirPlataformas />
       </section>
     </main>
   );

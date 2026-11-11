@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import { adicionarChave, validarLocais, type Resultado } from "./actions";
+import { adicionarChave, corrigirPlataformasAcao, validarLocais, type Resultado } from "./actions";
 
 function Enviar({ children, sec }: { children: React.ReactNode; sec?: boolean }) {
   const { pending } = useFormStatus();
@@ -48,4 +48,14 @@ export function BotaoValidarLocais() {
 
 export function BotaoEnviar({ children }: { children: React.ReactNode }) {
   return <Enviar sec>{children}</Enviar>;
+}
+
+export function BotaoCorrigirPlataformas() {
+  const [r, acao] = useActionState(corrigirPlataformasAcao, null);
+  return (
+    <form action={acao} className="space-y-2">
+      <Enviar sec>Separar sites de plataformas (lovable.app, vercel.app, wix…)</Enviar>
+      <Mensagem r={r} />
+    </form>
+  );
 }

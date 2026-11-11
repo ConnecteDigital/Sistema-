@@ -165,3 +165,19 @@ export async function adicionarNicho(form: FormData): Promise<void> {
   revalidatePath("/configuracoes");
   revalidatePath("/");
 }
+
+export async function corrigirPlataformasAcao(_: Resultado): Promise<Resultado> {
+  const { corrigirPlataformas } = await import("@/lib/manutencao");
+  try {
+    const r = await corrigirPlataformas();
+    if (!r.sites.length && !r.rodadas.length) return { ok: true, msg: "Nada para corrigir: nenhum site de plataforma agrupado." };
+    revalidatePath("/leads"); revalidatePath("/rodadas"); revalidatePath("/relatorios");
+    return {
+      ok: true,
+      msg: `Separados ${r.sites.length} sites (${r.sites.slice(0, 8).join(", ")}${r.sites.length > 8 ? "…" : ""}). ` +
+        `Rodadas refeitas: ${r.rodadas.map((x) => "#" + x).join(", ")}. Abra cada uma para terminar a verificação dos sites e o CNPJ (grátis).`,
+    };
+  } catch (e) {
+    return { ok: false, msg: e instanceof Error ? e.message : String(e) };
+  }
+}

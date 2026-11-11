@@ -8,10 +8,35 @@ const SUFIXOS_BR = [
 ];
 const SUFIXOS_OUTROS = ["co.uk", "com.ar", "com.mx", "com.pt"];
 
+/**
+ * Plataformas onde CADA subdomínio é um site (e uma empresa) diferente:
+ * "saneparts.lovable.app" e "nacarelli.lovable.app" NÃO são o mesmo anunciante.
+ */
+export const PLATAFORMAS = [
+  "lovable.app", "lovableproject.com", "vercel.app", "netlify.app", "github.io", "pages.dev", "web.app", "firebaseapp.com",
+  "onrender.com", "herokuapp.com", "railway.app", "fly.dev", "replit.app", "repl.co", "glitch.me", "base44.app", "bolt.host",
+  "webflow.io", "framer.website", "framer.app", "framer.ai", "wixsite.com", "wix.com", "editorx.io", "squarespace.com",
+  "square.site", "carrd.co", "godaddysites.com", "mystrikingly.com", "strikingly.com", "site123.me", "webnode.page",
+  "webnode.com.br", "webnode.com", "weebly.com", "jimdosite.com", "jimdofree.com", "wordpress.com", "blogspot.com",
+  "blogspot.com.br", "tumblr.com", "myshopify.com", "negocio.site", "business.site", "ueniweb.com", "hostingersite.com",
+  "000webhostapp.com", "bubbleapps.io", "softr.app", "notion.site", "linktr.ee", "my.canva.site", "canva.site",
+  "wordpress.site", "wpcomstaging.com", "durablesites.com", "durable.co", "b12sites.com", "zyrosite.com", "landingi.com",
+  "rdstation.com.br", "lpages.co", "builderallwppro.com", "kpages.online", "kpages.com.br", "nuvemshop.com.br",
+  "lojaintegrada.com.br", "mercadoshops.com.br", "glideapp.io", "adalo.com", "appspot.com", "azurewebsites.net",
+  "cloudfront.net", "amplifyapp.com", "surge.sh", "neocities.org",
+];
+
 /** "sc.ozielhidro.com.br" → "ozielhidro.com.br" */
 export function dominioRaiz(host: string): string {
   const h = host.toLowerCase().replace(/^www\./, "").replace(/\.$/, "");
   const partes = h.split(".");
+  // Site em plataforma: o anunciante é o subdomínio ("empresa.lovable.app")
+  for (const plat of PLATAFORMAS) {
+    if (h.endsWith("." + plat)) {
+      const resto = h.slice(0, -(plat.length + 1)).split(".");
+      return resto[resto.length - 1] + "." + plat;
+    }
+  }
   for (const suf of [...SUFIXOS_BR, ...SUFIXOS_OUTROS]) {
     if (h === suf) return h;
     if (h.endsWith("." + suf)) {

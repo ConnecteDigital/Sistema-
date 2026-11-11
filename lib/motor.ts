@@ -518,3 +518,9 @@ export async function gerarLeads(runId: number) {
 export async function reprocessar(runId: number) {
   await db().from("runs").update({ status: "verificando", erro: null, finalizada_em: null }).eq("id", runId);
 }
+
+/** Refaz a agregação de uma rodada do zero (usado na correção de domínios) e segue para sites/CNPJ/leads. */
+export async function reagregar(runId: number) {
+  await db().from("run_advertisers").delete().eq("run_id", runId);
+  await finalizar(runId);
+}
