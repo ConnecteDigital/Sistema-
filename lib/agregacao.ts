@@ -68,3 +68,61 @@ export function agregar(buscas: BuscaOk[], ads: AdBruto[], limites: Limites, blo
   }
   return saida.sort((a, b) => a.regionId - b.regionId || b.presenca - a.presenca);
 }
+
+// ---------------------------------------------------------------------------
+// Orgânico: em quantas buscas o site aparece na 1ª página (sem anúncio) e em que posição.
+// ---------------------------------------------------------------------------
+export type OrgBruto = { runSearchId: number; dominio: string; position: number | null };
+
+export type Organico = {
+  buscas: number;            // buscas da região em que o orgânico foi lido
+  aparicoes: number;         // em quantas delas o site apareceu
+  presenca: number;
+  posMedia: number | null;   // média da melhor posição em cada busca em que apareceu
+  melhorPos: number | null;
+};
+
+/**
+ * Orgânico por região × domínio. `lidas` = ids das buscas em que a resposta trouxe o bloco orgânico
+ * (só elas contam: busca sem o bloco não prova que o site não aparece).
+ */
+export function agregarOrganico(buscas: BuscaOk[], lidas: Set<number>, org: OrgBruto[]): {
+  porChave: Map<string, Organico>; buscasPorRegiao: Map<number, number>;
+} {
+  const buscaPorId = new Map(buscas.map((b) => [b.id, b]));
+  const buscasPorRegiao = new Map<number, number>();
+  for (const b of buscas) if (lidas.has(b.id)) buscasPorRegiao.set(b.regionId, (buscasPorRegiao.get(b.regionId) ?? 0) + 1);
+
+  // melhor posição de cada domínio em cada busca (o mesmo site pode aparecer 2x na mesma página)
+  const melhor = new Map<string, { regionId: number; dominio: string; porBusca: Map<number, number | null> }>();
+  for (const o of org) {
+    const b = buscaPorId.get(o.runSearchId);
+    if (!b || !lidas.has(b.id)) continue;
+    const chave = `${b.regionId}|${o.dominio}`;
+    if (!melhor.has(chave)) melhor.set(chave, { regionId: b.regionId, dominio: o.dominio, porBusca: new Map() });
+    const g = melhor.get(chave)!;
+    const atual = g.porBusca.get(b.id);
+    if (!g.porBusca.has(b.id) || (o.position !== null && (atual === null || atual === undefined || o.position < atual))) {
+      g.porBusca.set(b.id, o.position);
+    }
+  }
+
+  const porChave = new Map<string, Organico>();
+  for (const [chave, g] of melhor) {
+    const total = buscasPorRegiao.get(g.regionId) ?? 0;
+    const pos = [...g.porBusca.values()].filter((p): p is number => typeof p === "number");
+    porChave.set(chave, {
+      buscas: total, aparicoes: g.porBusca.size, presenca: total ? g.porBusca.size / total : 0,
+      posMedia: pos.length ? pos.reduce((s, p) => s + p, 0) / pos.length : null,
+      melhorPos: pos.length ? Math.min(...pos) : null,
+    });
+  }
+  return { porChave, buscasPorRegiao };
+}
+
+/** Orgânico de um anunciante na região: medido e não encontrado = 0 aparições; não medido = null. */
+export function organicoDe(regionId: number, dominio: string, r: ReturnType<typeof agregarOrganico>): Organico | null {
+  const total = r.buscasPorRegiao.get(regionId) ?? 0;
+  if (!total) return null;
+  return r.porChave.get(`${regionId}|${dominio}`) ?? { buscas: total, aparicoes: 0, presenca: 0, posMedia: null, melhorPos: null };
+}

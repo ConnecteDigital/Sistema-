@@ -1,5 +1,5 @@
 // Junta várias rodadas num relatório só, sem repetir anunciante, e compara os horários. Pura.
-import { forcaDe, type Limites } from "./agregacao";
+import { forcaDe, type Limites, type Organico } from "./agregacao";
 
 export type LinhaRodada = {
   id: number; advertiser_id: number; aparicoes: number; buscas: number; presenca: number; pontos: string[]; termos: string[];
@@ -7,7 +7,19 @@ export type LinhaRodada = {
   forca: string; nome: string | null; duplicado_mesma_busca: number; termo_no_site?: boolean | null; termos_ausentes?: string[];
   advertisers: { dominio: string; nome: string | null }; regions: { nome: string };
   por_rodada?: { rodada: number; presenca: number | null }[];
+  org_buscas?: number | null; org_aparicoes?: number | null; org_presenca?: number | null;
+  org_pos_media?: number | null; org_melhor_pos?: number | null;
 };
+
+/** Orgânico da linha do banco (null = não medido). */
+export function organicoDaLinha(l: LinhaRodada): Organico | null {
+  if (l.org_buscas === null || l.org_buscas === undefined || !Number(l.org_buscas)) return null;
+  return {
+    buscas: Number(l.org_buscas), aparicoes: Number(l.org_aparicoes ?? 0), presenca: Number(l.org_presenca ?? 0),
+    posMedia: l.org_pos_media === null || l.org_pos_media === undefined ? null : Number(l.org_pos_media),
+    melhorPos: l.org_melhor_pos === null || l.org_melhor_pos === undefined ? null : Number(l.org_melhor_pos),
+  };
+}
 
 export function combinarRodadas(rodadas: { rodada: number; linhas: LinhaRodada[] }[], limites: Limites): LinhaRodada[] {
   const ordem = [...rodadas].sort((a, b) => a.rodada - b.rodada);
@@ -33,6 +45,13 @@ export function combinarRodadas(rodadas: { rodada: number; linhas: LinhaRodada[]
     const comPos = itens.filter((x) => x.l.pos_media !== null);
     const apPos = comPos.reduce((s, x) => s + x.l.aparicoes, 0);
     const falas = itens.map((x) => x.l.termo_no_site).filter((v) => v !== null && v !== undefined);
+    // orgânico: soma só as rodadas em que foi medido
+    const orgs = itens.map((x) => organicoDaLinha(x.l)).filter((o): o is Organico => !!o);
+    const orgBuscas = orgs.reduce((s, o) => s + o.buscas, 0);
+    const orgAp = orgs.reduce((s, o) => s + o.aparicoes, 0);
+    const orgComPos = orgs.filter((o) => o.posMedia !== null && o.aparicoes > 0);
+    const orgApPos = orgComPos.reduce((s, o) => s + o.aparicoes, 0);
+    const melhores = orgs.map((o) => o.melhorPos).filter((p): p is number => p !== null);
     saida.push({
       ...ultima,
       aparicoes: ap, buscas, presenca, forca: forcaDe(presenca, limites),
@@ -44,6 +63,10 @@ export function combinarRodadas(rodadas: { rodada: number; linhas: LinhaRodada[]
       duplicado_mesma_busca: itens.reduce((s, x) => s + x.l.duplicado_mesma_busca, 0),
       termo_no_site: falas.includes(true) ? true : falas.includes(false) ? false : null,
       termos_ausentes: [...new Set(itens.flatMap((x) => x.l.termos_ausentes ?? []))],
+      org_buscas: orgBuscas || null, org_aparicoes: orgBuscas ? orgAp : null,
+      org_presenca: orgBuscas ? orgAp / orgBuscas : null,
+      org_pos_media: orgApPos ? orgComPos.reduce((s, o) => s + o.posMedia! * o.aparicoes, 0) / orgApPos : null,
+      org_melhor_pos: melhores.length ? Math.min(...melhores) : null,
       por_rodada: ordem.map((r) => {
         const x = itens.find((i) => i.rodada === r.rodada);
         if (x) return { rodada: r.rodada, presenca: Number(x.l.presenca) };

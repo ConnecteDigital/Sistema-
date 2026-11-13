@@ -9,7 +9,18 @@ import { OutrosDominios } from "./outros-dominios";
 import { ContaGoogleAds } from "@/components/conta-google-ads";
 import { OptinWhatsApp } from "@/components/optin-whatsapp";
 import { AnaliseAnuncio } from "@/components/analise-anuncio";
-import { analisarAnuncio, rotuloForca } from "@/lib/analise";
+import { analisarAnuncio, resumoOrganico, rotuloForca } from "@/lib/analise";
+import { organicoDaLinha, type LinhaRodada } from "@/lib/combinar";
+
+const CAMPOS_HIST = "run_id, presenca, aparicoes, buscas, forca, pos_media, pct_topo, pct_sitelinks, titulo, link, pontos, termos, regions(nome), runs(criado_em)";
+
+/** Histórico do anunciante; com o orgânico quando o banco já tem o 0013. */
+async function historicoDo(advertiserId: number) {
+  const consulta = (campos: string) => db().from("run_advertisers").select(campos)
+    .eq("advertiser_id", advertiserId).order("run_id", { ascending: false }).limit(50);
+  const com = await consulta(CAMPOS_HIST + ", org_buscas, org_aparicoes, org_presenca, org_pos_media, org_melhor_pos");
+  return com.error ? consulta(CAMPOS_HIST) : com;
+}
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Lead" };
@@ -23,9 +34,7 @@ export default async function Lead({ params }: { params: Promise<{ id: string }>
 
   const telE164 = (lead.telefone_principal ?? "").replace(/\D/g, "");
   const [historico, site, cnpj, eventos, equipe, outros, contaAds, waContato] = await Promise.all([
-    db().from("run_advertisers")
-      .select("run_id, presenca, aparicoes, buscas, forca, pos_media, pct_topo, pct_sitelinks, titulo, link, pontos, termos, regions(nome), runs(criado_em)")
-      .eq("advertiser_id", adv.id).order("run_id", { ascending: false }).limit(50),
+    historicoDo(adv.id),
     db().from("site_checks_recentes").select("*").eq("advertiser_id", adv.id).maybeSingle(),
     db().from("consultas_cnpj").select("resultado, consultado_em").eq("advertiser_id", adv.id).maybeSingle(),
     db().from("lead_events").select("tipo, texto, criado_em").eq("lead_id", id).order("criado_em", { ascending: false }).limit(50),
@@ -34,16 +43,14 @@ export default async function Lead({ params }: { params: Promise<{ id: string }>
     db().from("contas_google_ads").select("status, resultado, erro, consultado_em, bruto").eq("advertiser_id", adv.id).maybeSingle(),
     db().from("wa_contatos").select("optin_em, optout_em").eq("telefone", "55" + telE164).maybeSingle(),
   ]);
-  type H = { run_id: number; presenca: number; aparicoes: number; buscas: number; forca: string; pos_media: number | null;
-    pct_topo: number; pct_sitelinks: number; titulo: string | null; link: string | null; pontos: string[]; termos: string[];
-    regions: { nome: string }; runs: { criado_em: string } };
+  type H = LinhaRodada & { run_id: number; runs: { criado_em: string } };
   const hist = (historico.data ?? []) as unknown as H[];
   const s = site.data;
   const perfil = adv.dominio.startsWith("perfil-google:");
   const analise = analisarAnuncio(hist.map((h) => ({
     rodada: h.run_id, data: h.runs.criado_em, regiao: h.regions.nome, presenca: Number(h.presenca), aparicoes: h.aparicoes,
     buscas: h.buscas, posMedia: h.pos_media === null ? null : Number(h.pos_media), pctTopo: Number(h.pct_topo),
-    pontos: h.pontos ?? [], termos: h.termos ?? [],
+    pontos: h.pontos ?? [], termos: h.termos ?? [], organico: organicoDaLinha(h),
   })));
 
   return (
@@ -104,7 +111,7 @@ export default async function Lead({ params }: { params: Promise<{ id: string }>
 
       {analise && (
         <section className="cartao border-l-4 border-marca p-4">
-          <h2 className="mb-2 font-semibold">Análise do anúncio</h2>
+          <h2 className="mb-2 font-semibold">Análise: anúncio pago e orgânico</h2>
           <AnaliseAnuncio a={analise} />
         </section>
       )}
@@ -141,7 +148,7 @@ export default async function Lead({ params }: { params: Promise<{ id: string }>
           <table className="w-full min-w-[640px] text-xs">
             <thead className="text-left uppercase text-suave">
               <tr><th className="py-1 pr-3">Rodada</th><th className="pr-3">Região</th><th className="pr-3 text-right">Presença</th>
-                <th className="pr-3">Força</th><th className="pr-3 text-right">Pos.</th><th className="pr-3">Pontos</th><th>Anúncio</th></tr>
+                <th className="pr-3">Força (pago)</th><th className="pr-3 text-right">Pos.</th><th className="pr-3">Orgânico</th><th className="pr-3">Pontos</th><th>Anúncio</th></tr>
             </thead>
             <tbody>
               {hist.map((h) => (
@@ -152,6 +159,7 @@ export default async function Lead({ params }: { params: Promise<{ id: string }>
                   <td className="pr-3 text-right tabular-nums">{Math.round(Number(h.presenca) * 100)}% <span className="text-suave">({h.aparicoes}/{h.buscas})</span></td>
                   <td className="pr-3">{rotuloForca(h.forca, h.buscas)}</td>
                   <td className="pr-3 text-right">{h.pos_media ? Number(h.pos_media).toFixed(1) : "—"}</td>
+                  <td className="pr-3">{resumoOrganico(organicoDaLinha(h))}</td>
                   <td className="max-w-[200px] pr-3 text-suave">{h.pontos.join(", ")}</td>
                   <td className="max-w-[220px]">{h.titulo}{h.link && <a href={h.link} target="_blank" rel="noreferrer" className="block text-marca hover:underline">abrir</a>}</td>
                 </tr>

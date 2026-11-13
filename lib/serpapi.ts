@@ -44,12 +44,20 @@ export type AnuncioSerpApi = {
   tracking_link?: string;
 };
 
+export type OrganicoSerpApi = {
+  position?: number; title?: string; link?: string; displayed_link?: string; source?: string;
+};
+
 export type ResultadoBusca =
-  | { tipo: "ok"; anuncios: AnuncioSerpApi[]; localUsado: string | null }
+  // organicos = null quando a resposta não trouxe o bloco orgânico (não dá para afirmar que o site não aparece)
+  | { tipo: "ok"; anuncios: AnuncioSerpApi[]; organicos: OrganicoSerpApi[] | null; localUsado: string | null }
   | { tipo: "sem_creditos"; msg: string }
   | { tipo: "erro"; msg: string };
 
-/** Uma busca de anúncios ao vivo (engine google_ads, celular). Gasta 1 crédito (exceto cache de 1h). */
+/**
+ * Uma busca ao vivo (engine google_ads, celular). Gasta 1 crédito (exceto cache de 1h).
+ * A mesma resposta traz os anúncios (patrocinado) e os resultados orgânicos da 1ª página.
+ */
 export async function buscarAnuncios(apiKey: string, termo: string, location: string): Promise<ResultadoBusca> {
   const p = new URLSearchParams({
     engine: "google_ads", q: termo, location, google_domain: "google.com.br",
@@ -67,7 +75,7 @@ export async function buscarAnuncios(apiKey: string, termo: string, location: st
 
   if (erro) {
     // Sem anúncios/resultados não é erro: é uma busca válida com 0 anúncios
-    if (/hasn't returned any results|no results/i.test(erro)) return { tipo: "ok", anuncios: [], localUsado };
+    if (/hasn't returned any results|no results/i.test(erro)) return { tipo: "ok", anuncios: [], organicos: null, localUsado };
     if (r.status === 429 || /run out of searches|searches? (left|remaining)|plan.*limit|exceeded|rate limit/i.test(erro)) {
       return { tipo: "sem_creditos", msg: erro };
     }
@@ -75,5 +83,10 @@ export async function buscarAnuncios(apiKey: string, termo: string, location: st
     return { tipo: "erro", msg: erro };
   }
   if (!r.ok) return { tipo: "erro", msg: `SerpApi HTTP ${r.status}` };
-  return { tipo: "ok", anuncios: Array.isArray(j.ads) ? (j.ads as AnuncioSerpApi[]) : [], localUsado };
+  return {
+    tipo: "ok",
+    anuncios: Array.isArray(j.ads) ? (j.ads as AnuncioSerpApi[]) : [],
+    organicos: Array.isArray(j.organic_results) ? (j.organic_results as OrganicoSerpApi[]) : null,
+    localUsado,
+  };
 }
