@@ -11,6 +11,7 @@ export function FormModelo({ telefonePadrao }: { telefonePadrao: string }) {
   const [corpo, setCorpo] = useState(PADRAO);
   const [exemplos, setExemplos] = useState(["Desentupidora Exemplo", "o seu site está fora do ar e o anúncio continua rodando"]);
   const [rodape, setRodape] = useState("Connect Digital · Google Ads");
+  const [botaoInteresse, setBotaoInteresse] = useState("");
   const [botaoSair, setBotaoSair] = useState("Não tenho interesse");
   const [ligarTexto, setLigarTexto] = useState("Ligar para a Connect");
   const [ligarNumero, setLigarNumero] = useState(telefonePadrao);
@@ -22,7 +23,7 @@ export function FormModelo({ telefonePadrao }: { telefonePadrao: string }) {
     <form className="cartao space-y-3 p-4 text-sm" onSubmit={(e) => {
       e.preventDefault();
       iniciar(async () => setMsg(await criarModeloAcao({
-        nome, categoria, idioma: "pt_BR", corpo, exemplos, rodape, botaoSair, botaoLigarTexto: ligarTexto, botaoLigarNumero: ligarNumero,
+        nome, categoria, idioma: "pt_BR", corpo, exemplos, rodape, botaoInteresse, botaoSair, botaoLigarTexto: ligarTexto, botaoLigarNumero: ligarNumero,
       })));
     }}>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -51,10 +52,16 @@ export function FormModelo({ telefonePadrao }: { telefonePadrao: string }) {
       <label className="block space-y-1">Rodapé (opcional)
         <input value={rodape} onChange={(e) => setRodape(e.target.value)} className="campo w-full" maxLength={60} />
       </label>
-      <div className="grid gap-3 sm:grid-cols-3">
+      <p className="text-xs text-suave">Botões são opcionais: deixe em branco para mandar sem botão. Clicar em qualquer botão de resposta conta como resposta do cliente (abre as 24h).</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="space-y-1">Botão de interesse (resposta rápida)
+          <input value={botaoInteresse} onChange={(e) => setBotaoInteresse(e.target.value)} placeholder="ex.: Pode falar 👍" className="campo w-full" maxLength={25} />
+        </label>
         <label className="space-y-1">Botão de sair (resposta rápida)
           <input value={botaoSair} onChange={(e) => setBotaoSair(e.target.value)} className="campo w-full" maxLength={25} />
         </label>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
         <label className="space-y-1">Botão de ligar — texto
           <input value={ligarTexto} onChange={(e) => setLigarTexto(e.target.value)} className="campo w-full" maxLength={25} />
         </label>
@@ -66,6 +73,7 @@ export function FormModelo({ telefonePadrao }: { telefonePadrao: string }) {
         <p className="whitespace-pre-line">{corpo.replace(/\{\{(\d+)\}\}/g, (_, n) => exemplos[Number(n) - 1] || `[${n}]`)}</p>
         {rodape && <p className="mt-1 text-xs text-suave">{rodape}</p>}
         <div className="mt-2 flex flex-wrap gap-2 text-xs">
+          {botaoInteresse && <span className="rounded border border-borda bg-white px-2 py-1">↩ {botaoInteresse}</span>}
           {botaoSair && <span className="rounded border border-borda bg-white px-2 py-1">↩ {botaoSair}</span>}
           {ligarTexto && ligarNumero && <span className="rounded border border-borda bg-white px-2 py-1">📞 {ligarTexto}</span>}
         </div>

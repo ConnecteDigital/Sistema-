@@ -177,7 +177,7 @@ export async function concluirEmbeddedSignup(codigo: string, wabaId: string | nu
 // ---------------------------------------------------------------------------
 export type NovoModelo = {
   nome: string; categoria: "MARKETING" | "UTILITY"; idioma: string; corpo: string; exemplos: string[];
-  rodape?: string; botaoSair?: string; botaoLigarTexto?: string; botaoLigarNumero?: string;
+  rodape?: string; botaoInteresse?: string; botaoSair?: string; botaoLigarTexto?: string; botaoLigarNumero?: string;
 };
 
 export function nomeModeloValido(n: string) {
@@ -193,6 +193,7 @@ export async function criarModelo(m: NovoModelo): Promise<{ id: string; status: 
   }];
   if (m.rodape?.trim()) components.push({ type: "FOOTER", text: m.rodape.trim().slice(0, 60) });
   const botoes: Record<string, unknown>[] = [];
+  if (m.botaoInteresse?.trim()) botoes.push({ type: "QUICK_REPLY", text: m.botaoInteresse.trim().slice(0, 25) });
   if (m.botaoSair?.trim()) botoes.push({ type: "QUICK_REPLY", text: m.botaoSair.trim().slice(0, 25) });
   if (m.botaoLigarTexto?.trim() && m.botaoLigarNumero?.replace(/\D/g, "")) {
     const d = m.botaoLigarNumero.replace(/\D/g, "");
