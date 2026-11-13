@@ -26,7 +26,10 @@ type Valor = {
 /** Eventos: status das mensagens enviadas e mensagens recebidas. Sempre responde 200 rápido. */
 export async function POST(req: Request) {
   const corpo = await req.text();
-  if (!assinaturaValida(corpo, req.headers.get("x-hub-signature-256"))) return new Response("assinatura inválida", { status: 401 });
+  if (!assinaturaValida(corpo, req.headers.get("x-hub-signature-256"))) {
+    console.warn("[webhook] assinatura inválida — confira META_APP_SECRET / WHATSAPP_APP_SECRET na Vercel");
+    return new Response("assinatura inválida", { status: 401 });
+  }
   let j: { entry?: { changes?: { value?: Valor }[] }[] };
   try { j = JSON.parse(corpo); } catch { return NextResponse.json({ ok: true }); }
 
@@ -55,14 +58,19 @@ export async function POST(req: Request) {
         const { data: env } = await db().from("wa_envios").select("lead_id").eq("telefone", m.from).order("id", { ascending: false }).limit(1).maybeSingle();
         leadId = env?.lead_id ?? null;
       }
-      await db().from("wa_mensagens").upsert(
-        { telefone: m.from, lead_id: leadId, direcao: "entrada", tipo: m.type, texto, wamid: m.id, bruto: m as unknown as object },
-        { onConflict: "wamid", ignoreDuplicates: true });
+      // grava a mensagem (sem duplicar se a Meta reenviar o mesmo aviso)
+      const { data: jaTem } = await db().from("wa_mensagens").select("id").eq("wamid", m.id).maybeSingle();
+      if (!jaTem) {
+        const { error: eMsg } = await db().from("wa_mensagens").insert(
+          { telefone: m.from, lead_id: leadId, direcao: "entrada", tipo: m.type, texto, wamid: m.id, bruto: m as unknown as object });
+        if (eMsg) console.error("[webhook] erro ao gravar mensagem:", eMsg.message);
+      }
 
       const sair = pedeParaSair(texto) || /nao tenho interesse|sair da lista/i.test((m.button?.payload ?? "").normalize("NFD").replace(/[̀-ͯ]/g, ""));
-      await db().from("wa_contatos").upsert({
+      const { error: eCont } = await db().from("wa_contatos").upsert({
         telefone: m.from, lead_id: leadId, ultima_entrada: agora, ...(sair ? { optout_em: agora } : {}),
       }, { onConflict: "telefone" });
+      if (eCont) console.error("[webhook] erro ao gravar contato:", eCont.message);
 
       // marca o último envio como respondido e o lead como "Respondeu"
       const { data: ultimo } = await db().from("wa_envios").select("id").eq("telefone", m.from).not("wamid", "is", null)
@@ -79,5 +87,6 @@ export async function POST(req: Request) {
       }
     }
   }
+  console.log(`[webhook] ok: ${(j.entry ?? []).flatMap((e) => e.changes ?? []).map((c) => `${(c.value?.messages ?? []).length} msg, ${(c.value?.statuses ?? []).length} status`).join(" | ")}`);
   return NextResponse.json({ ok: true });
 }
