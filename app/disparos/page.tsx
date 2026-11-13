@@ -1,18 +1,19 @@
 import Link from "next/link";
 import { db } from "@/lib/supabase";
 import { formatarData } from "@/lib/utils";
-import { listarModelos, saudeNumero, whatsappFaltando, type Modelo, type SaudeNumero } from "@/lib/whatsapp";
+import { configWhatsapp, listarModelos, saudeNumero, whatsappFaltando, type Modelo, type SaudeNumero } from "@/lib/whatsapp";
 import { enviadosUltimas24h } from "@/lib/disparos";
 import { salvarLimites } from "./actions";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Disparos" };
 
-const COR_QUALIDADE: Record<string, string> = { GREEN: "bg-green-100 text-green-800", YELLOW: "bg-amber-100 text-amber-800", RED: "bg-red-600 text-white" };
-const NOME_QUALIDADE: Record<string, string> = { GREEN: "Verde (boa)", YELLOW: "Amarela (atenção)", RED: "Vermelha (pare os disparos)" };
+const COR_QUALIDADE: Record<string, string> = { GREEN: "bg-green-100 text-green-800", YELLOW: "bg-amber-100 text-amber-800", RED: "bg-red-600 text-white", UNKNOWN: "bg-slate-100 text-slate-700" };
+const NOME_QUALIDADE: Record<string, string> = { GREEN: "Verde (boa)", YELLOW: "Amarela (atenção)", RED: "Vermelha (pare os disparos)", UNKNOWN: "Ainda sem nota (número novo)" };
 
 export default async function Disparos() {
   const faltando = await whatsappFaltando();
+  const origem = (await configWhatsapp().catch(() => null))?.origem ?? null;
   const { data: conexao } = await db().from("wa_conexao").select("numero, nome, conectado_em").eq("ativo", true).order("id", { ascending: false }).limit(1).maybeSingle();
   let saude: SaudeNumero | null = null, modelos: Modelo[] = [], erroMeta: string | null = null;
   if (!faltando.some((f) => f.startsWith("Conectar"))) {
@@ -52,10 +53,12 @@ export default async function Disparos() {
         <div>
           <p className="font-medium">WhatsApp conectado</p>
           <p className="text-suave">
-            {conexao ? `${conexao.nome ?? ""} ${conexao.numero ?? ""} · desde ${formatarData(conexao.conectado_em)} · mesmo número no app do celular (coexistência)` : "Nenhum número conectado ainda."}
+            {origem === "variaveis"
+              ? `${saude?.nome ?? ""} ${saude?.numero ?? ""} · número só da API (configurado na Vercel). O botão ao lado é para conectar o número do celular com coexistência, depois da análise do app.`
+              : conexao ? `${conexao.nome ?? ""} ${conexao.numero ?? ""} · desde ${formatarData(conexao.conectado_em)} · mesmo número no app do celular (coexistência)` : "Nenhum número conectado ainda."}
           </p>
         </div>
-        <Link href="/disparos/conectar" className={conexao ? "botao-sec" : "botao"}>{conexao ? "Reconectar" : "Conectar WhatsApp"}</Link>
+        <Link href="/disparos/conectar" className={conexao || origem ? "botao-sec" : "botao"}>{conexao ? "Reconectar" : origem === "variaveis" ? "Conectar número do celular" : "Conectar WhatsApp"}</Link>
       </div>
       {erroMeta && <p className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">Erro na Meta: {erroMeta}</p>}
 
@@ -111,7 +114,7 @@ export default async function Disparos() {
       <section className="cartao space-y-2 p-4">
         <h2 className="font-semibold">Modelos aprovados pela Meta ({aprovados.length})</h2>
         <p className="text-xs text-suave">
-          Crie e edite modelos no WhatsApp Manager (business.facebook.com → WhatsApp → Modelos de mensagem). Eles aparecem aqui quando aprovados.
+          Crie modelos em <Link href="/disparos/modelos" className="text-marca hover:underline">Modelos e teste</Link> (ou no WhatsApp Manager). Eles aparecem aqui quando a Meta aprova.
         </p>
         {modelos.map((m) => (
           <div key={m.nome + m.idioma} className="rounded-lg border border-borda p-3 text-sm">
