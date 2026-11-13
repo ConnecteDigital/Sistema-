@@ -92,3 +92,9 @@ export async function enviarTesteAcao(telefone: string, modelo: string, idioma: 
     return { ok: false, msg: e instanceof Error ? e.message : String(e) };
   }
 }
+
+export async function ligarWebhooksAcao() {
+  const { ligarWebhooksDaConta } = await import("@/lib/whatsapp");
+  try { await ligarWebhooksDaConta(); revalidatePath("/disparos"); return { ok: true, msg: "Conta ligada ao app. Mande uma mensagem para o chip e veja em Conversas." }; }
+  catch (e) { return { ok: false, msg: e instanceof Error ? e.message : String(e) }; }
+}

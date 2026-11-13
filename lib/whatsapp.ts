@@ -205,3 +205,40 @@ export async function criarModelo(m: NovoModelo): Promise<{ id: string; status: 
   });
   return j;
 }
+
+// ---------------------------------------------------------------------------
+// Diagnóstico do webhook: a conta do WhatsApp está ligada ao app? o app tem webhook cadastrado?
+// ---------------------------------------------------------------------------
+export type DiagnosticoWebhook = {
+  contaLigada: boolean | null; appsDaConta: string[]; erroConta: string | null;
+  callbackUrl: string | null; campos: string[]; ativo: boolean | null; erroApp: string | null;
+};
+
+export async function diagnosticoWebhook(): Promise<DiagnosticoWebhook> {
+  const c = await cfg();
+  const out: DiagnosticoWebhook = { contaLigada: null, appsDaConta: [], erroConta: null, callbackUrl: null, campos: [], ativo: null, erroApp: null };
+  const appId = process.env.META_APP_ID?.trim();
+  try {
+    const j = await graph<{ data?: { whatsapp_business_api_data?: { id?: string; name?: string } }[] }>(`${c.wabaId}/subscribed_apps`);
+    out.appsDaConta = (j.data ?? []).map((a) => `${a.whatsapp_business_api_data?.name ?? "?"} (${a.whatsapp_business_api_data?.id ?? "?"})`);
+    out.contaLigada = appId ? (j.data ?? []).some((a) => a.whatsapp_business_api_data?.id === appId) : (j.data ?? []).length > 0;
+  } catch (e) { out.erroConta = e instanceof Error ? e.message : String(e); }
+  const segredo = process.env.META_APP_SECRET?.trim();
+  if (appId && segredo) {
+    try {
+      const j = await graph<{ data?: { object?: string; callback_url?: string; active?: boolean; fields?: { name: string }[] }[] }>(
+        `${appId}/subscriptions`, undefined, `${appId}|${segredo}`);
+      const w = (j.data ?? []).find((s) => s.object === "whatsapp_business_account");
+      out.callbackUrl = w?.callback_url ?? null; out.ativo = w?.active ?? null; out.campos = (w?.fields ?? []).map((f) => f.name);
+    } catch (e) { out.erroApp = e instanceof Error ? e.message : String(e); }
+  } else {
+    out.erroApp = "META_APP_ID / META_APP_SECRET não configurados (não dá para ler o webhook do app).";
+  }
+  return out;
+}
+
+/** Liga a conta do WhatsApp ao nosso app (para a Meta mandar os webhooks dessa conta). */
+export async function ligarWebhooksDaConta() {
+  const c = await cfg();
+  await graph(`${c.wabaId}/subscribed_apps`, { method: "POST" });
+}

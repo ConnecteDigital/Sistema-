@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { db } from "@/lib/supabase";
 import { formatarData } from "@/lib/utils";
-import { configWhatsapp, listarModelos, saudeNumero, whatsappFaltando, type Modelo, type SaudeNumero } from "@/lib/whatsapp";
+import { configWhatsapp, diagnosticoWebhook, listarModelos, saudeNumero, whatsappFaltando, type DiagnosticoWebhook, type Modelo, type SaudeNumero } from "@/lib/whatsapp";
+import { BotaoLigarWebhooks } from "./diagnostico";
 import { enviadosUltimas24h } from "@/lib/disparos";
 import { salvarLimites } from "./actions";
 
@@ -15,9 +16,9 @@ export default async function Disparos() {
   const faltando = await whatsappFaltando();
   const origem = (await configWhatsapp().catch(() => null))?.origem ?? null;
   const { data: conexao } = await db().from("wa_conexao").select("numero, nome, conectado_em").eq("ativo", true).order("id", { ascending: false }).limit(1).maybeSingle();
-  let saude: SaudeNumero | null = null, modelos: Modelo[] = [], erroMeta: string | null = null;
+  let saude: SaudeNumero | null = null, modelos: Modelo[] = [], erroMeta: string | null = null, diag: DiagnosticoWebhook | null = null;
   if (!faltando.some((f) => f.startsWith("Conectar"))) {
-    try { [saude, modelos] = await Promise.all([saudeNumero(), listarModelos()]); }
+    try { [saude, modelos, diag] = await Promise.all([saudeNumero(), listarModelos(), diagnosticoWebhook()]); }
     catch (e) { erroMeta = e instanceof Error ? e.message : String(e); }
   }
   const [campanhas, cfg, usados, contatos] = await Promise.all([
@@ -86,6 +87,26 @@ export default async function Disparos() {
           <p className="text-[11px] text-suave">{sairam} pediram para sair (nunca recebem)</p>
         </div>
       </div>
+
+      {diag && (
+        <section className={`cartao space-y-2 p-4 text-sm ${diag.contaLigada === false || !diag.callbackUrl ? "border-amber-300" : ""}`}>
+          <h2 className="font-semibold">Webhook (respostas e status chegando no sistema)</h2>
+          <ul className="space-y-1">
+            <li>{diag.contaLigada ? "✅" : "❌"} Conta do WhatsApp ligada ao app
+              {diag.appsDaConta.length > 0 && <span className="text-suave"> · apps: {diag.appsDaConta.join(", ")}</span>}
+              {diag.erroConta && <span className="text-red-600"> · {diag.erroConta}</span>}</li>
+            <li>{diag.callbackUrl ? "✅" : "❌"} Endereço do webhook no app: <span className="font-mono text-xs">{diag.callbackUrl ?? "não cadastrado"}</span>
+              {diag.erroApp && <span className="text-red-600"> · {diag.erroApp}</span>}</li>
+            <li>{diag.campos.includes("messages") ? "✅" : "❌"} Campo <code>messages</code> assinado
+              {diag.campos.length > 0 && <span className="text-suave"> · campos: {diag.campos.join(", ")}</span>}</li>
+          </ul>
+          {!diag.contaLigada && <BotaoLigarWebhooks />}
+          <p className="text-xs text-suave">
+            Se tudo estiver ✅ e mesmo assim nada chegar em Conversas: confira no topo do painel do app na Meta se ele está em
+            “Modo de desenvolvimento” — algumas entregas só acontecem com o app publicado (“Ao vivo”).
+          </p>
+        </section>
+      )}
 
       <section className="cartao space-y-3 p-4">
         <h2 className="font-semibold">Campanhas</h2>
