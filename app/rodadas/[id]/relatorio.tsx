@@ -4,13 +4,13 @@ import { BotaoCopiar } from "./copiar";
 import type { Linha } from "./tabela";
 
 import { montarDonos, type Dono } from "@/lib/donos";
-import { analisarAnuncio } from "@/lib/analise";
+import { analisarAnuncio, resumoOrganico } from "@/lib/analise";
 import { AnaliseAnuncio } from "@/components/analise-anuncio";
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 const analiseDo = (d: Dono) => {
   const l = d.principal;
   return analisarAnuncio([{ regiao: l.regiao, presenca: l.presenca, aparicoes: l.aparicoes, buscas: l.buscas,
-    posMedia: l.pos_media, pctTopo: l.pct_topo, pontos: l.pontos ?? [], termos: l.termos ?? [] }]);
+    posMedia: l.pos_media, pctTopo: l.pct_topo, pontos: l.pontos ?? [], termos: l.termos ?? [], organico: l.organico }]);
 };
 
 export function RelatorioLigacao({ linhas, semResumo = false, titulo = "Relatório — quem ligar" }: { linhas: Linha[]; semResumo?: boolean; titulo?: string }) {
@@ -25,9 +25,9 @@ export function RelatorioLigacao({ linhas, semResumo = false, titulo = "Relatór
     const a = analiseDo(d);
     return [
       `${i + 1}. [${d.prioridade}] ${d.empresa}${d.cnpj ? ` (CNPJ ${d.cnpj})` : ""}`,
-      `   ${d.telefone ?? "sem telefone"} · ${d.sites.join(", ")} · presença ${pct(d.presenca)}`,
+      `   ${d.telefone ?? "sem telefone"} · ${d.sites.join(", ")} · anúncio pago ${pct(d.presenca)} · orgânico ${resumoOrganico(d.principal.organico)}`,
       ...d.principal.observacoes.slice(0, 2).map((o) => `   ${o}`),
-      a ? `   Anúncio: ${a.resumo}` : "",
+      a ? `   ${a.resumo}` : "",
       a && !a.amostraPequena ? `   O que falar: "${a.abordagem}"` : "",
       ...(a?.cuidados ?? []).map((c) => `   Cuidado: ${c}`),
     ].filter(Boolean).join("\n");
@@ -64,7 +64,8 @@ export function RelatorioLigacao({ linhas, semResumo = false, titulo = "Relatór
           <thead className="text-left text-xs uppercase text-suave">
             <tr className="border-b border-borda">
               <th className="py-2 pr-2">#</th><th className="pr-3">Prioridade</th><th className="pr-3">Empresa</th>
-              <th className="pr-3">Telefone</th><th className="pr-3">Por que ligar</th><th className="pr-3 text-right">Presença</th>
+              <th className="pr-3">Telefone</th><th className="pr-3">Por que ligar</th><th className="pr-3 text-right">Anúncio pago</th>
+              <th className="pr-3 text-right">Orgânico</th>
               <th>Status</th>
             </tr>
           </thead>
@@ -111,13 +112,19 @@ export function RelatorioLigacao({ linhas, semResumo = false, titulo = "Relatór
                     if (!a) return null;
                     return (
                       <details className="mt-1">
-                        <summary className="cursor-pointer text-marca">Análise do anúncio e o que falar</summary>
+                        <summary className="cursor-pointer text-marca">Análise (pago e orgânico) e o que falar</summary>
                         <div className="mt-1"><AnaliseAnuncio a={a} compacto /></div>
                       </details>
                     );
                   })()}
                 </td>
                 <td className="pr-3 text-right tabular-nums">{pct(d.presenca)}<span className="block text-[11px] text-suave">{d.regioes.join(", ")}</span></td>
+                <td className="max-w-[130px] pr-3 text-right text-xs tabular-nums">
+                  {d.principal.organico
+                    ? <>{d.principal.organico.aparicoes}/{d.principal.organico.buscas}
+                        <span className="block text-[11px] text-suave">{d.principal.organico.posMedia !== null ? `posição ${d.principal.organico.posMedia.toFixed(1).replace(".", ",")}` : "fora da 1ª página"}</span></>
+                    : <span className="text-suave">não medido</span>}
+                </td>
                 <td className="text-xs">{d.principal.statusLead ?? "—"}</td>
               </tr>
             ))}

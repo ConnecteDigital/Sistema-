@@ -1,11 +1,18 @@
 import type { Analise } from "@/lib/analise";
 
-/** Bloco "Análise do anúncio": leitura, causas, o que falar e cuidados. */
+/** Bloco "Análise": anúncio pago, orgânico, causas, o que falar e cuidados. */
 export function AnaliseAnuncio({ a, compacto = false }: { a: Analise; compacto?: boolean }) {
   return (
     <div className={`space-y-2 ${compacto ? "text-xs" : "text-sm"}`}>
       <p className="font-medium">{a.resumo}</p>
-      <ul className="list-inside list-disc space-y-0.5">{a.leitura.map((l) => <li key={l}>{l}</li>)}</ul>
+      <div>
+        <p className="font-medium">Anúncio pago (patrocinado):</p>
+        <ul className="list-inside list-disc space-y-0.5">{a.leitura.map((l) => <li key={l}>{l}</li>)}</ul>
+      </div>
+      <div>
+        <p className="font-medium">Orgânico (o site, sem anúncio):</p>
+        <ul className="list-inside list-disc space-y-0.5">{a.organico.map((l) => <li key={l}>{l}</li>)}</ul>
+      </div>
       {a.causas.length > 0 && (
         <div>
           <p className="font-medium">Causas mais comuns:</p>

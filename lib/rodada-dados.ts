@@ -3,15 +3,20 @@ import { db } from "./supabase";
 import { agruparDonos } from "./grupos";
 import type { ResultadoCnpj } from "./consulta-cnpj";
 import type { Linha } from "./linha";
-import { combinarRodadas, type LinhaRodada } from "./combinar";
+import { combinarRodadas, organicoDaLinha, type LinhaRodada } from "./combinar";
 import { lerSettings } from "./motor";
 
 export type { Linha } from "./linha";
 
 const BASE = "id, advertiser_id, aparicoes, buscas, presenca, pontos, termos, pos_media, pct_topo, pct_sitelinks, titulo, link, forca, nome, duplicado_mesma_busca, advertisers(dominio, nome), regions(nome)";
 
+const ORG = "org_buscas, org_aparicoes, org_presenca, org_pos_media, org_melhor_pos";
+
 /** Linhas da rodada. Funciona mesmo se o 0006 (palavra-chave errada) ainda não foi rodado no banco. */
 export async function buscarLinhasBanco(runId: number): Promise<LinhaBanco[]> {
+  const org = await db().from("run_advertisers").select(BASE + ", termo_no_site, termos_ausentes, " + ORG).eq("run_id", runId).limit(5000);
+  if (!org.error) return (org.data ?? []) as unknown as LinhaBanco[];
+  // banco sem o 0013 (orgânico): segue sem
   const com = await db().from("run_advertisers").select(BASE + ", termo_no_site, termos_ausentes").eq("run_id", runId).limit(5000);
   if (!com.error) return (com.data ?? []) as unknown as LinhaBanco[];
   const sem = await db().from("run_advertisers").select(BASE).eq("run_id", runId).limit(5000);
@@ -53,6 +58,7 @@ export async function montarLinhas(listaA: LinhaBanco[], pronta: boolean): Promi
     grupo: a.advertiser_id,
     termoNoSite: a.termo_no_site ?? null, termosAusentes: a.termos_ausentes ?? [],
     porRodada: a.por_rodada,
+    organico: organicoDaLinha(a),
   }));
   const grupos = agruparDonos([...new Map(linhas.map((l) => [l.advertiserId, l])).values()].map((l) => ({
     id: l.advertiserId, cnpjs: l.cnpjs, telefones: [l.telefone, ...l.outrosTelefones].filter((t): t is string => !!t), tags: l.tags,

@@ -74,11 +74,12 @@ export function TabelaAnunciantes({ linhas }: { linhas: Linha[] }) {
               {temLeads && <th className="px-3 py-2">Prioridade</th>}
               <th className="px-3 py-2">Anunciante</th>
               <th className="px-3 py-2">Contato</th>
-              <th className="px-3 py-2 text-right">Aparições</th>
-              <th className="px-3 py-2">Força</th>
+              <th className="px-3 py-2 text-right">Anúncio pago</th>
+              <th className="px-3 py-2">Força (pago)</th>
               <th className="px-3 py-2 text-right">Pos.</th>
               <th className="px-3 py-2 text-right">Topo</th>
               <th className="px-3 py-2 text-right">Sitelinks</th>
+              <th className="px-3 py-2 text-right">Orgânico</th>
               <th className="px-3 py-2">Onde apareceu</th>
               <th className="px-3 py-2">Anúncio</th>
               <th className="px-3 py-2">Empresa (CNPJ)</th>
@@ -144,6 +145,16 @@ export function TabelaAnunciantes({ linhas }: { linhas: Linha[] }) {
                   <td className="px-3 py-2 text-right tabular-nums">{l.pos_media?.toFixed(1) ?? "—"}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{pct(l.pct_topo)}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{pct(l.pct_sitelinks)}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+                    {l.organico ? (
+                      <>
+                        <span className="font-semibold">{l.organico.aparicoes}/{l.organico.buscas}</span>
+                        <span className="block text-xs text-suave">
+                          {l.organico.posMedia !== null ? `posição ${l.organico.posMedia.toFixed(1).replace(".", ",")}` : "fora da 1ª página"}
+                        </span>
+                      </>
+                    ) : <span className="text-xs text-suave">não medido</span>}
+                  </td>
                   <td className="max-w-[220px] px-3 py-2 text-xs text-suave">
                     {l.pontos.join(", ")}
                     <span className="mt-0.5 block text-[11px]">{l.termos.join(" · ")}</span>
@@ -177,7 +188,8 @@ export function TabelaAnunciantes({ linhas }: { linhas: Linha[] }) {
         </table>
       </div>
       <p className="text-xs text-suave">
-        Força: Fraca &lt; 40% das buscas da região · Média 40–75% · Forte &gt; 75%. É uma foto deste horário.
+        Força (pago): o anúncio aparece em menos de 40% das buscas da região = Fraca · 40–75% = Média · mais de 75% = Forte.
+        Orgânico: em quantas buscas o site aparece na 1ª página sem anúncio, e a posição média. É uma foto deste horário.
         {temLeads && " Prioridade: Máxima = site fora do ar · Alta = força Fraca/Média · Normal = Forte · Baixa = rede, 0800 ou agência."}
       </p>
     </div>

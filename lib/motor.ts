@@ -1,9 +1,9 @@
 import "server-only";
 import { db } from "./supabase";
 import { descriptografar } from "./crypto";
-import { buscarAnuncios, consultarConta } from "./serpapi";
+import { buscarAnuncios, consultarConta, type OrganicoSerpApi } from "./serpapi";
 import { identificarAnunciante } from "./dominio";
-import { agregar, type AdBruto, type BuscaOk, type Limites } from "./agregacao";
+import { agregar, agregarOrganico, organicoDe, type AdBruto, type BuscaOk, type Limites, type OrgBruto } from "./agregacao";
 import { analisarPagina, baixarPagina } from "./site";
 import { dominioRaiz, hostDe } from "./dominio";
 import { avaliarLead, montarContexto, type PresencaRegiao, type SiteResumo } from "./regras";
@@ -194,6 +194,7 @@ export async function processarLote(runId: number): Promise<Progresso> {
             };
           });
           if (linhas.length) await db().from("ads_raw").insert(linhas);
+          await gravarOrganicos(s.id, r.organicos);
           await db().from("run_searches").update({
             status: "ok", serp_key_id: k.id, executada_em: new Date().toISOString(),
             location_usada: r.localUsado, qtd_anuncios: linhas.length, erro: null,
@@ -227,6 +228,27 @@ export async function processarLote(runId: number): Promise<Progresso> {
 
   await finalizar(runId);
   return progresso(runId);
+}
+
+/**
+ * Grava os resultados orgânicos da busca (mesma resposta, sem crédito a mais).
+ * Separado do status da busca de propósito: se o banco ainda não tiver o 0013, a rodada segue sem orgânico.
+ */
+async function gravarOrganicos(runSearchId: number, organicos: OrganicoSerpApi[] | null) {
+  try {
+    await db().from("organic_raw").delete().eq("run_search_id", runSearchId);
+    const linhas = (organicos ?? []).flatMap((o) => {
+      const host = hostDe(o.link) ?? hostDe(o.displayed_link);
+      if (!host || /(^|\.)google\.[a-z.]+$/.test(host)) return [];
+      return [{
+        run_search_id: runSearchId, position: typeof o.position === "number" ? o.position : null,
+        title: o.title ?? null, link: o.link ?? null, displayed_link: o.displayed_link ?? null,
+        source: o.source ?? null, dominio: dominioRaiz(host),
+      }];
+    });
+    if (linhas.length) await db().from("organic_raw").insert(linhas);
+    await db().from("run_searches").update({ qtd_organicos: organicos ? linhas.length : null }).eq("id", runSearchId);
+  } catch { /* orgânico é complemento: nunca trava a rodada */ }
 }
 
 /** Tenta de novo uma rodada parada (créditos acabaram): limpa o erro. */
@@ -269,6 +291,7 @@ async function finalizar(runId: number) {
     temSitelinks: Array.isArray(a.sitelinks) ? a.sitelinks.length > 0 : !!(a.sitelinks && Object.keys(a.sitelinks as object).length),
   }));
   const agregados = agregar(buscasOk, adsBrutos, limites, new Set((bl ?? []).map((b) => b.dominio)));
+  const organico = await lerOrganicoDaRodada(runId, buscasOk);
 
   // Anunciantes (únicos por domínio)
   const agora = new Date().toISOString();
@@ -289,6 +312,7 @@ async function finalizar(runId: number) {
     termos: a.termos, pos_media: a.posMedia === null ? null : Number(a.posMedia.toFixed(2)),
     pct_topo: Number(a.pctTopo.toFixed(4)), pct_sitelinks: Number(a.pctSitelinks.toFixed(4)),
     titulo: a.titulo, link: a.link, forca: a.forca, duplicado_mesma_busca: a.duplicadoMesmaBusca,
+    ...(organico ? camposOrganico(organicoDe(a.regionId, a.dominio, organico)) : {}),
   }));
   for (let i = 0; i < linhas.length; i += 500) {
     const { error } = await db().from("run_advertisers")
@@ -303,6 +327,32 @@ async function finalizar(runId: number) {
 
   // Saldo real das chaves (grátis)
   await atualizarCreditosAtivos().catch(() => {});
+}
+
+/** Orgânico da rodada. null = banco sem o 0013 (aí as colunas org_* nem são enviadas). */
+async function lerOrganicoDaRodada(runId: number, buscasOk: BuscaOk[]) {
+  try {
+    type LinhaLida = { id: number; qtd_organicos: number | null };
+    const lidasRaw = await todas<LinhaLida>((de, ate) => db().from("run_searches")
+      .select("id, qtd_organicos").eq("run_id", runId).eq("status", "ok").not("qtd_organicos", "is", null)
+      .order("id").range(de, ate) as never);
+    type LinhaOrg = { run_search_id: number; dominio: string | null; position: number | null };
+    const org = await todas<LinhaOrg>((de, ate) => db().from("organic_raw")
+      .select("run_search_id, dominio, position, run_searches!inner(run_id)")
+      .eq("run_searches.run_id", runId).order("id").range(de, ate) as never);
+    const brutos: OrgBruto[] = org.filter((o) => o.dominio).map((o) => ({ runSearchId: o.run_search_id, dominio: o.dominio!, position: o.position }));
+    return agregarOrganico(buscasOk, new Set(lidasRaw.map((l) => l.id)), brutos);
+  } catch {
+    return null;
+  }
+}
+
+function camposOrganico(o: ReturnType<typeof organicoDe>) {
+  if (!o) return { org_buscas: null, org_aparicoes: null, org_presenca: null, org_pos_media: null, org_melhor_pos: null };
+  return {
+    org_buscas: o.buscas, org_aparicoes: o.aparicoes, org_presenca: Number(o.presenca.toFixed(4)),
+    org_pos_media: o.posMedia === null ? null : Number(o.posMedia.toFixed(2)), org_melhor_pos: o.melhorPos,
+  };
 }
 
 // ---------------------------------------------------------------------------
