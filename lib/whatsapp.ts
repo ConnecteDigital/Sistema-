@@ -38,7 +38,7 @@ async function cfg(): Promise<ConfigWa> {
   return c;
 }
 
-export type ErroMeta = { code?: number; message?: string; error_subcode?: number; error_data?: { details?: string } };
+export type ErroMeta = { code?: number; message?: string; error_subcode?: number; error_data?: { details?: string }; error_user_title?: string; error_user_msg?: string };
 
 async function graph<T>(caminho: string, init?: RequestInit, token?: string): Promise<T> {
   const t = token ?? (await cfg()).token;
@@ -48,7 +48,8 @@ async function graph<T>(caminho: string, init?: RequestInit, token?: string): Pr
   const j = await r.json().catch(() => ({}));
   if (!r.ok || j.error) {
     const e = (j.error ?? {}) as ErroMeta;
-    const err = new Error(`Meta (${e.code ?? r.status}): ${e.error_data?.details ?? e.message ?? "erro"}`) as Error & { meta?: ErroMeta };
+    const detalhe = [e.error_user_title, e.error_user_msg ?? e.error_data?.details ?? e.message].filter(Boolean).join(" — ");
+    const err = new Error(`Meta (${e.code ?? r.status}${e.error_subcode ? "/" + e.error_subcode : ""}): ${detalhe || "erro"}`) as Error & { meta?: ErroMeta };
     err.meta = e;
     throw err;
   }

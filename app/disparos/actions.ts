@@ -70,8 +70,13 @@ export async function salvarLimites(form: FormData) {
 }
 
 export async function criarModeloAcao(m: import("@/lib/whatsapp").NovoModelo) {
-  const { criarModelo } = await import("@/lib/whatsapp");
+  const { criarModelo, listarModelos, nomeModeloValido } = await import("@/lib/whatsapp");
   try {
+    const nome = nomeModeloValido(m.nome);
+    const existente = (await listarModelos().catch(() => [])).find((x) => x.nome === nome && x.idioma === m.idioma);
+    if (existente) {
+      return { ok: false, msg: `Já existe um modelo chamado "${nome}" (status: ${existente.status}). A Meta não aceita o mesmo nome duas vezes: use outro nome (ex.: ${nome}_2).` };
+    }
     const r = await criarModelo(m);
     revalidatePath("/disparos");
     return { ok: true, msg: `Modelo enviado para aprovação (status: ${r.status}). Acompanhe na tela Disparos.` };
