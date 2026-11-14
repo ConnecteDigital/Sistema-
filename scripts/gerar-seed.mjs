@@ -67,6 +67,25 @@ const regioes = [
     ["Mongaguá", "Mongagua" + SP, "City", "ampla", 0],
     ["Bertioga", "Bertioga" + SP, "City", "ampla", 0],
   ]},
+  { nome: "014 Bauru e Marília", uf: "SP", ddd: "14", descricao: "Centro-oeste paulista", pontos: [
+    ["Bauru", "Bauru" + SP, "City", "minima", 0],
+    ["Marília", "Marilia" + SP, "City", "minima", 0],
+    ["Jaú", "Jau" + SP, "City", "media", 0],
+    ["Botucatu", "Botucatu" + SP, "City", "media", 0],
+    ["Ourinhos", "Ourinhos" + SP, "City", "media", 0],
+    ["Lins", "Lins" + SP, "City", "ampla", 0],
+    ["Avaré", "Avare" + SP, "City", "ampla", 0],
+    ["Lençóis Paulista", "Lencois Paulista" + SP, "City", "ampla", 0],
+  ]},
+  { nome: "015 Sorocaba e região", uf: "SP", ddd: "15", descricao: "Sorocaba e sudoeste paulista", pontos: [
+    ["Sorocaba", "Sorocaba" + SP, "City", "minima", 0],
+    ["Votorantim", "Votorantim" + SP, "City", "media", 0],
+    ["Itapetininga", "Itapetininga" + SP, "City", "media", 0],
+    ["Tatuí", "Tatui" + SP, "City", "media", 0],
+    ["Itapeva", "Itapeva" + SP, "City", "ampla", 0],
+    ["Boituva", "Boituva" + SP, "City", "ampla", 0],
+    ["Porto Feliz", "Porto Feliz" + SP, "City", "ampla", 0],
+  ]},
   { nome: "019 Campinas e região", uf: "SP", ddd: "19", descricao: "Cidades grandes do 019", pontos: [
     ["Campinas", "Campinas" + SP, "City", "minima", 1],
     ["Piracicaba", "Piracicaba" + SP, "City", "minima", 0],
@@ -85,6 +104,16 @@ const regioes = [
     ["São Carlos", "Sao Carlos" + SP, "City", "media", 0],
     ["Franca", "Franca" + SP, "City", "media", 0],
     ["Sertãozinho", "Sertaozinho" + SP, "City", "ampla", 0],
+  ]},
+  { nome: "017 São José do Rio Preto e região", uf: "SP", ddd: "17", descricao: "Noroeste paulista", pontos: [
+    ["São José do Rio Preto", "Sao Jose do Rio Preto" + SP, "City", "minima", 0],
+    ["Catanduva", "Catanduva" + SP, "City", "media", 0],
+    ["Barretos", "Barretos" + SP, "City", "media", 0],
+    ["Votuporanga", "Votuporanga" + SP, "City", "media", 0],
+    ["Mirassol", "Mirassol" + SP, "City", "ampla", 0],
+    ["Fernandópolis", "Fernandopolis" + SP, "City", "ampla", 0],
+    ["Bebedouro", "Bebedouro" + SP, "City", "ampla", 0],
+    ["Jales", "Jales" + SP, "City", "ampla", 0],
   ]},
   { nome: "041 Curitiba e região", uf: "PR", ddd: "41", descricao: "Curitiba e região metropolitana", pontos: [
     ["Curitiba", "Curitiba" + PR, "City", "minima", 1],
@@ -257,4 +286,30 @@ for (const [k, v] of Object.entries(settings)) {
 sql += `\ninsert into equipe (nome) values ('Gabriel') on conflict (nome) do nothing;\n`;
 
 writeFileSync(new URL("../supabase/migrations/0002_seed.sql", import.meta.url), sql);
+
+// 0012: só as regiões novas do interior de SP (DDD 14, 15, 17) + ordem atualizada
+let sql12 = `-- Robô de Prospecção — novas regiões do interior de SP: DDD 014, 015 e 017.
+-- Supabase → SQL Editor → New query → colar TUDO → Run. Pode rodar de novo sem problema.
+-- Não apaga nada. Depois, em Configurações, clique em "Validar locais" (grátis).
+
+`;
+regioes.forEach((r, i) => {
+  if (!["14", "15", "17"].includes(r.ddd)) {
+    sql12 += `update regions set ordem = ${i} where nome = ${q(r.nome)};\n`;
+    return;
+  }
+  sql12 += `\ninsert into regions (nome, uf, ddd, descricao, ordem) values (${q(r.nome)}, ${q(r.uf)}, ${q(r.ddd)}, ${q(r.descricao)}, ${i})
+  on conflict (nome) do update set uf = excluded.uf, ddd = excluded.ddd, descricao = excluded.descricao, ordem = excluded.ordem;\n`;
+  const valores = r.pontos.map(([n, c, t, cam, v, d]) =>
+    `  (${q(n)}, ${q(c)}, ${q(t)}, ${q(cam)}, ${q(d ?? r.ddd)}, ${v ? "now()" : "null::timestamptz"})`).join(",\n");
+  sql12 += `insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
+select r.id, v.* from regions r, (values
+${valores}
+) as v(nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
+where r.nome = ${q(r.nome)}
+on conflict (region_id, serpapi_canonical) do nothing;\n\n`;
+});
+sql12 += `select r.nome, count(l.id) as cidades from regions r left join locations l on l.region_id = r.id
+ where r.ddd in ('14','15','17') group by r.nome order by r.nome;\n`;
+writeFileSync(new URL("../supabase/migrations/0012_regioes_sp_interior.sql", import.meta.url), sql12);
 console.log("ok:", regioes.reduce((a, r) => a + r.pontos.length, 0), "pontos");
