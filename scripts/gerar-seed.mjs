@@ -115,6 +115,16 @@ const regioes = [
     ["Bebedouro", "Bebedouro" + SP, "City", "ampla", 0],
     ["Jales", "Jales" + SP, "City", "ampla", 0],
   ]},
+  { nome: "018 Presidente Prudente e Araçatuba", uf: "SP", ddd: "18", descricao: "Oeste paulista", pontos: [
+    ["Presidente Prudente", "Presidente Prudente" + SP, "City", "minima", 0],
+    ["Araçatuba", "Aracatuba" + SP, "City", "minima", 0],
+    ["Birigui", "Birigui" + SP, "City", "media", 0],
+    ["Assis", "Assis" + SP, "City", "media", 0],
+    ["Andradina", "Andradina" + SP, "City", "media", 0],
+    ["Penápolis", "Penapolis" + SP, "City", "ampla", 0],
+    ["Adamantina", "Adamantina" + SP, "City", "ampla", 0],
+    ["Dracena", "Dracena" + SP, "City", "ampla", 0],
+  ]},
   { nome: "041 Curitiba e região", uf: "PR", ddd: "41", descricao: "Curitiba e região metropolitana", pontos: [
     ["Curitiba", "Curitiba" + PR, "City", "minima", 1],
     ["São José dos Pinhais", "Sao Jose dos Pinhais" + PR, "City", "media", 1],
@@ -287,14 +297,15 @@ sql += `\ninsert into equipe (nome) values ('Gabriel') on conflict (nome) do not
 
 writeFileSync(new URL("../supabase/migrations/0002_seed.sql", import.meta.url), sql);
 
-// 0012: só as regiões novas do interior de SP (DDD 14, 15, 17) + ordem atualizada
-let sql12 = `-- Robô de Prospecção — novas regiões do interior de SP: DDD 014, 015 e 017.
+// Migrações só com regiões novas (não reinsere cidades apagadas à mão) + ordem atualizada
+function regioesNovas(arquivo, ddds, titulo) {
+let sql12 = `-- Robô de Prospecção — ${titulo}
 -- Supabase → SQL Editor → New query → colar TUDO → Run. Pode rodar de novo sem problema.
 -- Não apaga nada. Depois, em Configurações, clique em "Validar locais" (grátis).
 
 `;
 regioes.forEach((r, i) => {
-  if (!["14", "15", "17"].includes(r.ddd)) {
+  if (!ddds.includes(r.ddd)) {
     sql12 += `update regions set ordem = ${i} where nome = ${q(r.nome)};\n`;
     return;
   }
@@ -310,6 +321,9 @@ where r.nome = ${q(r.nome)}
 on conflict (region_id, serpapi_canonical) do nothing;\n\n`;
 });
 sql12 += `select r.nome, count(l.id) as cidades from regions r left join locations l on l.region_id = r.id
- where r.ddd in ('14','15','17') group by r.nome order by r.nome;\n`;
-writeFileSync(new URL("../supabase/migrations/0012_regioes_sp_interior.sql", import.meta.url), sql12);
+ where r.ddd in (${ddds.map(q).join(",")}) group by r.nome order by r.nome;\n`;
+writeFileSync(new URL(`../supabase/migrations/${arquivo}`, import.meta.url), sql12);
+}
+regioesNovas("0012_regioes_sp_interior.sql", ["14", "15", "17"], "novas regiões do interior de SP: DDD 014, 015 e 017.");
+regioesNovas("0013_regiao_018.sql", ["18"], "nova região do oeste de SP: DDD 018.");
 console.log("ok:", regioes.reduce((a, r) => a + r.pontos.length, 0), "pontos");

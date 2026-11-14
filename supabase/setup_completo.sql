@@ -419,7 +419,23 @@ select r.id, v.* from regions r, (values
 where r.nome = '017 São José do Rio Preto e região'
 on conflict (region_id, serpapi_canonical) do nothing;
 
-insert into regions (nome, uf, ddd, descricao, ordem) values ('041 Curitiba e região', 'PR', '41', 'Curitiba e região metropolitana', 10)
+insert into regions (nome, uf, ddd, descricao, ordem) values ('018 Presidente Prudente e Araçatuba', 'SP', '18', 'Oeste paulista', 10)
+  on conflict (nome) do update set uf = excluded.uf, ddd = excluded.ddd, descricao = excluded.descricao, ordem = excluded.ordem;
+insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
+select r.id, v.* from regions r, (values
+  ('Presidente Prudente', 'Presidente Prudente,State of Sao Paulo,Brazil', 'City', 'minima', '18', null::timestamptz),
+  ('Araçatuba', 'Aracatuba,State of Sao Paulo,Brazil', 'City', 'minima', '18', null::timestamptz),
+  ('Birigui', 'Birigui,State of Sao Paulo,Brazil', 'City', 'media', '18', null::timestamptz),
+  ('Assis', 'Assis,State of Sao Paulo,Brazil', 'City', 'media', '18', null::timestamptz),
+  ('Andradina', 'Andradina,State of Sao Paulo,Brazil', 'City', 'media', '18', null::timestamptz),
+  ('Penápolis', 'Penapolis,State of Sao Paulo,Brazil', 'City', 'ampla', '18', null::timestamptz),
+  ('Adamantina', 'Adamantina,State of Sao Paulo,Brazil', 'City', 'ampla', '18', null::timestamptz),
+  ('Dracena', 'Dracena,State of Sao Paulo,Brazil', 'City', 'ampla', '18', null::timestamptz)
+) as v(nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
+where r.nome = '018 Presidente Prudente e Araçatuba'
+on conflict (region_id, serpapi_canonical) do nothing;
+
+insert into regions (nome, uf, ddd, descricao, ordem) values ('041 Curitiba e região', 'PR', '41', 'Curitiba e região metropolitana', 11)
   on conflict (nome) do update set uf = excluded.uf, ddd = excluded.ddd, descricao = excluded.descricao, ordem = excluded.ordem;
 insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 select r.id, v.* from regions r, (values
@@ -433,7 +449,7 @@ select r.id, v.* from regions r, (values
 where r.nome = '041 Curitiba e região'
 on conflict (region_id, serpapi_canonical) do nothing;
 
-insert into regions (nome, uf, ddd, descricao, ordem) values ('048 Florianópolis e região', 'SC', '48', 'Grande Florianópolis', 11)
+insert into regions (nome, uf, ddd, descricao, ordem) values ('048 Florianópolis e região', 'SC', '48', 'Grande Florianópolis', 12)
   on conflict (nome) do update set uf = excluded.uf, ddd = excluded.ddd, descricao = excluded.descricao, ordem = excluded.ordem;
 insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 select r.id, v.* from regions r, (values
@@ -446,7 +462,7 @@ select r.id, v.* from regions r, (values
 where r.nome = '048 Florianópolis e região'
 on conflict (region_id, serpapi_canonical) do nothing;
 
-insert into regions (nome, uf, ddd, descricao, ordem) values ('047 Joinville e Blumenau', 'SC', '47', 'Norte de SC e Vale do Itajaí', 12)
+insert into regions (nome, uf, ddd, descricao, ordem) values ('047 Joinville e Blumenau', 'SC', '47', 'Norte de SC e Vale do Itajaí', 13)
   on conflict (nome) do update set uf = excluded.uf, ddd = excluded.ddd, descricao = excluded.descricao, ordem = excluded.ordem;
 insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 select r.id, v.* from regions r, (values
@@ -456,7 +472,7 @@ select r.id, v.* from regions r, (values
 where r.nome = '047 Joinville e Blumenau'
 on conflict (region_id, serpapi_canonical) do nothing;
 
-insert into regions (nome, uf, ddd, descricao, ordem) values ('047 Balneário Camboriú e região', 'SC', '47', 'Litoral norte de SC', 13)
+insert into regions (nome, uf, ddd, descricao, ordem) values ('047 Balneário Camboriú e região', 'SC', '47', 'Litoral norte de SC', 14)
   on conflict (nome) do update set uf = excluded.uf, ddd = excluded.ddd, descricao = excluded.descricao, ordem = excluded.ordem;
 insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 select r.id, v.* from regions r, (values
@@ -468,7 +484,7 @@ select r.id, v.* from regions r, (values
 where r.nome = '047 Balneário Camboriú e região'
 on conflict (region_id, serpapi_canonical) do nothing;
 
-insert into regions (nome, uf, ddd, descricao, ordem) values ('061 Distrito Federal', 'DF', '61', 'Brasília e regiões administrativas', 14)
+insert into regions (nome, uf, ddd, descricao, ordem) values ('061 Distrito Federal', 'DF', '61', 'Brasília e regiões administrativas', 15)
   on conflict (nome) do update set uf = excluded.uf, ddd = excluded.ddd, descricao = excluded.descricao, ordem = excluded.ordem;
 insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 select r.id, v.* from regions r, (values
@@ -484,7 +500,7 @@ select r.id, v.* from regions r, (values
 where r.nome = '061 Distrito Federal'
 on conflict (region_id, serpapi_canonical) do nothing;
 
-insert into regions (nome, uf, ddd, descricao, ordem) values ('062 Goiânia e região', 'GO', '62', 'Grande Goiânia', 15)
+insert into regions (nome, uf, ddd, descricao, ordem) values ('062 Goiânia e região', 'GO', '62', 'Grande Goiânia', 16)
   on conflict (nome) do update set uf = excluded.uf, ddd = excluded.ddd, descricao = excluded.descricao, ordem = excluded.ordem;
 insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 select r.id, v.* from regions r, (values
@@ -497,7 +513,7 @@ select r.id, v.* from regions r, (values
 where r.nome = '062 Goiânia e região'
 on conflict (region_id, serpapi_canonical) do nothing;
 
-insert into regions (nome, uf, ddd, descricao, ordem) values ('065 Cuiabá e região', 'MT', '65', 'Cuiabá e Várzea Grande', 16)
+insert into regions (nome, uf, ddd, descricao, ordem) values ('065 Cuiabá e região', 'MT', '65', 'Cuiabá e Várzea Grande', 17)
   on conflict (nome) do update set uf = excluded.uf, ddd = excluded.ddd, descricao = excluded.descricao, ordem = excluded.ordem;
 insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 select r.id, v.* from regions r, (values
@@ -507,7 +523,7 @@ select r.id, v.* from regions r, (values
 where r.nome = '065 Cuiabá e região'
 on conflict (region_id, serpapi_canonical) do nothing;
 
-insert into regions (nome, uf, ddd, descricao, ordem) values ('068 Rio Branco e região', 'AC', '68', 'Capital de AC e cidades próximas', 17)
+insert into regions (nome, uf, ddd, descricao, ordem) values ('068 Rio Branco e região', 'AC', '68', 'Capital de AC e cidades próximas', 18)
   on conflict (nome) do update set uf = excluded.uf, ddd = excluded.ddd, descricao = excluded.descricao, ordem = excluded.ordem;
 insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 select r.id, v.* from regions r, (values
@@ -517,7 +533,7 @@ select r.id, v.* from regions r, (values
 where r.nome = '068 Rio Branco e região'
 on conflict (region_id, serpapi_canonical) do nothing;
 
-insert into regions (nome, uf, ddd, descricao, ordem) values ('082 Maceió e região', 'AL', '82', 'Capital de AL e cidades próximas', 18)
+insert into regions (nome, uf, ddd, descricao, ordem) values ('082 Maceió e região', 'AL', '82', 'Capital de AL e cidades próximas', 19)
   on conflict (nome) do update set uf = excluded.uf, ddd = excluded.ddd, descricao = excluded.descricao, ordem = excluded.ordem;
 insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 select r.id, v.* from regions r, (values
@@ -531,7 +547,7 @@ select r.id, v.* from regions r, (values
 where r.nome = '082 Maceió e região'
 on conflict (region_id, serpapi_canonical) do nothing;
 
-insert into regions (nome, uf, ddd, descricao, ordem) values ('096 Macapá e região', 'AP', '96', 'Capital de AP e cidades próximas', 19)
+insert into regions (nome, uf, ddd, descricao, ordem) values ('096 Macapá e região', 'AP', '96', 'Capital de AP e cidades próximas', 20)
   on conflict (nome) do update set uf = excluded.uf, ddd = excluded.ddd, descricao = excluded.descricao, ordem = excluded.ordem;
 insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 select r.id, v.* from regions r, (values
@@ -541,7 +557,7 @@ select r.id, v.* from regions r, (values
 where r.nome = '096 Macapá e região'
 on conflict (region_id, serpapi_canonical) do nothing;
 
-insert into regions (nome, uf, ddd, descricao, ordem) values ('092 Manaus e região', 'AM', '92', 'Capital de AM e cidades próximas', 20)
+insert into regions (nome, uf, ddd, descricao, ordem) values ('092 Manaus e região', 'AM', '92', 'Capital de AM e cidades próximas', 21)
   on conflict (nome) do update set uf = excluded.uf, ddd = excluded.ddd, descricao = excluded.descricao, ordem = excluded.ordem;
 insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 select r.id, v.* from regions r, (values
@@ -554,7 +570,7 @@ select r.id, v.* from regions r, (values
 where r.nome = '092 Manaus e região'
 on conflict (region_id, serpapi_canonical) do nothing;
 
-insert into regions (nome, uf, ddd, descricao, ordem) values ('071 Salvador e região', 'BA', '71', 'Capital de BA e cidades próximas', 21)
+insert into regions (nome, uf, ddd, descricao, ordem) values ('071 Salvador e região', 'BA', '71', 'Capital de BA e cidades próximas', 22)
   on conflict (nome) do update set uf = excluded.uf, ddd = excluded.ddd, descricao = excluded.descricao, ordem = excluded.ordem;
 insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 select r.id, v.* from regions r, (values
@@ -570,7 +586,7 @@ select r.id, v.* from regions r, (values
 where r.nome = '071 Salvador e região'
 on conflict (region_id, serpapi_canonical) do nothing;
 
-insert into regions (nome, uf, ddd, descricao, ordem) values ('085 Fortaleza e região', 'CE', '85', 'Capital de CE e cidades próximas', 22)
+insert into regions (nome, uf, ddd, descricao, ordem) values ('085 Fortaleza e região', 'CE', '85', 'Capital de CE e cidades próximas', 23)
   on conflict (nome) do update set uf = excluded.uf, ddd = excluded.ddd, descricao = excluded.descricao, ordem = excluded.ordem;
 insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 select r.id, v.* from regions r, (values
@@ -585,7 +601,7 @@ select r.id, v.* from regions r, (values
 where r.nome = '085 Fortaleza e região'
 on conflict (region_id, serpapi_canonical) do nothing;
 
-insert into regions (nome, uf, ddd, descricao, ordem) values ('027 Vitória e região', 'ES', '27', 'Capital de ES e cidades próximas', 23)
+insert into regions (nome, uf, ddd, descricao, ordem) values ('027 Vitória e região', 'ES', '27', 'Capital de ES e cidades próximas', 24)
   on conflict (nome) do update set uf = excluded.uf, ddd = excluded.ddd, descricao = excluded.descricao, ordem = excluded.ordem;
 insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 select r.id, v.* from regions r, (values
@@ -600,7 +616,7 @@ select r.id, v.* from regions r, (values
 where r.nome = '027 Vitória e região'
 on conflict (region_id, serpapi_canonical) do nothing;
 
-insert into regions (nome, uf, ddd, descricao, ordem) values ('098 São Luís e região', 'MA', '98', 'Capital de MA e cidades próximas', 24)
+insert into regions (nome, uf, ddd, descricao, ordem) values ('098 São Luís e região', 'MA', '98', 'Capital de MA e cidades próximas', 25)
   on conflict (nome) do update set uf = excluded.uf, ddd = excluded.ddd, descricao = excluded.descricao, ordem = excluded.ordem;
 insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 select r.id, v.* from regions r, (values
@@ -614,7 +630,7 @@ select r.id, v.* from regions r, (values
 where r.nome = '098 São Luís e região'
 on conflict (region_id, serpapi_canonical) do nothing;
 
-insert into regions (nome, uf, ddd, descricao, ordem) values ('067 Campo Grande e região', 'MS', '67', 'Capital de MS e cidades próximas', 25)
+insert into regions (nome, uf, ddd, descricao, ordem) values ('067 Campo Grande e região', 'MS', '67', 'Capital de MS e cidades próximas', 26)
   on conflict (nome) do update set uf = excluded.uf, ddd = excluded.ddd, descricao = excluded.descricao, ordem = excluded.ordem;
 insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 select r.id, v.* from regions r, (values
@@ -628,7 +644,7 @@ select r.id, v.* from regions r, (values
 where r.nome = '067 Campo Grande e região'
 on conflict (region_id, serpapi_canonical) do nothing;
 
-insert into regions (nome, uf, ddd, descricao, ordem) values ('031 Belo Horizonte e região', 'MG', '31', 'Capital de MG e cidades próximas', 26)
+insert into regions (nome, uf, ddd, descricao, ordem) values ('031 Belo Horizonte e região', 'MG', '31', 'Capital de MG e cidades próximas', 27)
   on conflict (nome) do update set uf = excluded.uf, ddd = excluded.ddd, descricao = excluded.descricao, ordem = excluded.ordem;
 insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 select r.id, v.* from regions r, (values
@@ -643,7 +659,7 @@ select r.id, v.* from regions r, (values
 where r.nome = '031 Belo Horizonte e região'
 on conflict (region_id, serpapi_canonical) do nothing;
 
-insert into regions (nome, uf, ddd, descricao, ordem) values ('091 Belém e região', 'PA', '91', 'Capital de PA e cidades próximas', 27)
+insert into regions (nome, uf, ddd, descricao, ordem) values ('091 Belém e região', 'PA', '91', 'Capital de PA e cidades próximas', 28)
   on conflict (nome) do update set uf = excluded.uf, ddd = excluded.ddd, descricao = excluded.descricao, ordem = excluded.ordem;
 insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 select r.id, v.* from regions r, (values
@@ -657,7 +673,7 @@ select r.id, v.* from regions r, (values
 where r.nome = '091 Belém e região'
 on conflict (region_id, serpapi_canonical) do nothing;
 
-insert into regions (nome, uf, ddd, descricao, ordem) values ('083 João Pessoa e região', 'PB', '83', 'Capital de PB e cidades próximas', 28)
+insert into regions (nome, uf, ddd, descricao, ordem) values ('083 João Pessoa e região', 'PB', '83', 'Capital de PB e cidades próximas', 29)
   on conflict (nome) do update set uf = excluded.uf, ddd = excluded.ddd, descricao = excluded.descricao, ordem = excluded.ordem;
 insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 select r.id, v.* from regions r, (values
@@ -671,7 +687,7 @@ select r.id, v.* from regions r, (values
 where r.nome = '083 João Pessoa e região'
 on conflict (region_id, serpapi_canonical) do nothing;
 
-insert into regions (nome, uf, ddd, descricao, ordem) values ('081 Recife e região', 'PE', '81', 'Capital de PE e cidades próximas', 29)
+insert into regions (nome, uf, ddd, descricao, ordem) values ('081 Recife e região', 'PE', '81', 'Capital de PE e cidades próximas', 30)
   on conflict (nome) do update set uf = excluded.uf, ddd = excluded.ddd, descricao = excluded.descricao, ordem = excluded.ordem;
 insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 select r.id, v.* from regions r, (values
@@ -686,7 +702,7 @@ select r.id, v.* from regions r, (values
 where r.nome = '081 Recife e região'
 on conflict (region_id, serpapi_canonical) do nothing;
 
-insert into regions (nome, uf, ddd, descricao, ordem) values ('086 Teresina e região', 'PI', '86', 'Capital de PI e cidades próximas', 30)
+insert into regions (nome, uf, ddd, descricao, ordem) values ('086 Teresina e região', 'PI', '86', 'Capital de PI e cidades próximas', 31)
   on conflict (nome) do update set uf = excluded.uf, ddd = excluded.ddd, descricao = excluded.descricao, ordem = excluded.ordem;
 insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 select r.id, v.* from regions r, (values
@@ -697,7 +713,7 @@ select r.id, v.* from regions r, (values
 where r.nome = '086 Teresina e região'
 on conflict (region_id, serpapi_canonical) do nothing;
 
-insert into regions (nome, uf, ddd, descricao, ordem) values ('021 Rio de Janeiro e região', 'RJ', '21', 'Capital de RJ e cidades próximas', 31)
+insert into regions (nome, uf, ddd, descricao, ordem) values ('021 Rio de Janeiro e região', 'RJ', '21', 'Capital de RJ e cidades próximas', 32)
   on conflict (nome) do update set uf = excluded.uf, ddd = excluded.ddd, descricao = excluded.descricao, ordem = excluded.ordem;
 insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 select r.id, v.* from regions r, (values
@@ -713,7 +729,7 @@ select r.id, v.* from regions r, (values
 where r.nome = '021 Rio de Janeiro e região'
 on conflict (region_id, serpapi_canonical) do nothing;
 
-insert into regions (nome, uf, ddd, descricao, ordem) values ('084 Natal e região', 'RN', '84', 'Capital de RN e cidades próximas', 32)
+insert into regions (nome, uf, ddd, descricao, ordem) values ('084 Natal e região', 'RN', '84', 'Capital de RN e cidades próximas', 33)
   on conflict (nome) do update set uf = excluded.uf, ddd = excluded.ddd, descricao = excluded.descricao, ordem = excluded.ordem;
 insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 select r.id, v.* from regions r, (values
@@ -727,7 +743,7 @@ select r.id, v.* from regions r, (values
 where r.nome = '084 Natal e região'
 on conflict (region_id, serpapi_canonical) do nothing;
 
-insert into regions (nome, uf, ddd, descricao, ordem) values ('051 Porto Alegre e região', 'RS', '51', 'Capital de RS e cidades próximas', 33)
+insert into regions (nome, uf, ddd, descricao, ordem) values ('051 Porto Alegre e região', 'RS', '51', 'Capital de RS e cidades próximas', 34)
   on conflict (nome) do update set uf = excluded.uf, ddd = excluded.ddd, descricao = excluded.descricao, ordem = excluded.ordem;
 insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 select r.id, v.* from regions r, (values
@@ -743,7 +759,7 @@ select r.id, v.* from regions r, (values
 where r.nome = '051 Porto Alegre e região'
 on conflict (region_id, serpapi_canonical) do nothing;
 
-insert into regions (nome, uf, ddd, descricao, ordem) values ('069 Porto Velho e região', 'RO', '69', 'Capital de RO e cidades próximas', 34)
+insert into regions (nome, uf, ddd, descricao, ordem) values ('069 Porto Velho e região', 'RO', '69', 'Capital de RO e cidades próximas', 35)
   on conflict (nome) do update set uf = excluded.uf, ddd = excluded.ddd, descricao = excluded.descricao, ordem = excluded.ordem;
 insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 select r.id, v.* from regions r, (values
@@ -757,7 +773,7 @@ select r.id, v.* from regions r, (values
 where r.nome = '069 Porto Velho e região'
 on conflict (region_id, serpapi_canonical) do nothing;
 
-insert into regions (nome, uf, ddd, descricao, ordem) values ('095 Boa Vista e região', 'RR', '95', 'Capital de RR e cidades próximas', 35)
+insert into regions (nome, uf, ddd, descricao, ordem) values ('095 Boa Vista e região', 'RR', '95', 'Capital de RR e cidades próximas', 36)
   on conflict (nome) do update set uf = excluded.uf, ddd = excluded.ddd, descricao = excluded.descricao, ordem = excluded.ordem;
 insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 select r.id, v.* from regions r, (values
@@ -766,7 +782,7 @@ select r.id, v.* from regions r, (values
 where r.nome = '095 Boa Vista e região'
 on conflict (region_id, serpapi_canonical) do nothing;
 
-insert into regions (nome, uf, ddd, descricao, ordem) values ('079 Aracaju e região', 'SE', '79', 'Capital de SE e cidades próximas', 36)
+insert into regions (nome, uf, ddd, descricao, ordem) values ('079 Aracaju e região', 'SE', '79', 'Capital de SE e cidades próximas', 37)
   on conflict (nome) do update set uf = excluded.uf, ddd = excluded.ddd, descricao = excluded.descricao, ordem = excluded.ordem;
 insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 select r.id, v.* from regions r, (values
@@ -779,7 +795,7 @@ select r.id, v.* from regions r, (values
 where r.nome = '079 Aracaju e região'
 on conflict (region_id, serpapi_canonical) do nothing;
 
-insert into regions (nome, uf, ddd, descricao, ordem) values ('063 Palmas e região', 'TO', '63', 'Capital de TO e cidades próximas', 37)
+insert into regions (nome, uf, ddd, descricao, ordem) values ('063 Palmas e região', 'TO', '63', 'Capital de TO e cidades próximas', 38)
   on conflict (nome) do update set uf = excluded.uf, ddd = excluded.ddd, descricao = excluded.descricao, ordem = excluded.ordem;
 insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
 select r.id, v.* from regions r, (values
@@ -1230,34 +1246,35 @@ select r.id, v.* from regions r, (values
 where r.nome = '017 São José do Rio Preto e região'
 on conflict (region_id, serpapi_canonical) do nothing;
 
-update regions set ordem = 10 where nome = '041 Curitiba e região';
-update regions set ordem = 11 where nome = '048 Florianópolis e região';
-update regions set ordem = 12 where nome = '047 Joinville e Blumenau';
-update regions set ordem = 13 where nome = '047 Balneário Camboriú e região';
-update regions set ordem = 14 where nome = '061 Distrito Federal';
-update regions set ordem = 15 where nome = '062 Goiânia e região';
-update regions set ordem = 16 where nome = '065 Cuiabá e região';
-update regions set ordem = 17 where nome = '068 Rio Branco e região';
-update regions set ordem = 18 where nome = '082 Maceió e região';
-update regions set ordem = 19 where nome = '096 Macapá e região';
-update regions set ordem = 20 where nome = '092 Manaus e região';
-update regions set ordem = 21 where nome = '071 Salvador e região';
-update regions set ordem = 22 where nome = '085 Fortaleza e região';
-update regions set ordem = 23 where nome = '027 Vitória e região';
-update regions set ordem = 24 where nome = '098 São Luís e região';
-update regions set ordem = 25 where nome = '067 Campo Grande e região';
-update regions set ordem = 26 where nome = '031 Belo Horizonte e região';
-update regions set ordem = 27 where nome = '091 Belém e região';
-update regions set ordem = 28 where nome = '083 João Pessoa e região';
-update regions set ordem = 29 where nome = '081 Recife e região';
-update regions set ordem = 30 where nome = '086 Teresina e região';
-update regions set ordem = 31 where nome = '021 Rio de Janeiro e região';
-update regions set ordem = 32 where nome = '084 Natal e região';
-update regions set ordem = 33 where nome = '051 Porto Alegre e região';
-update regions set ordem = 34 where nome = '069 Porto Velho e região';
-update regions set ordem = 35 where nome = '095 Boa Vista e região';
-update regions set ordem = 36 where nome = '079 Aracaju e região';
-update regions set ordem = 37 where nome = '063 Palmas e região';
+update regions set ordem = 10 where nome = '018 Presidente Prudente e Araçatuba';
+update regions set ordem = 11 where nome = '041 Curitiba e região';
+update regions set ordem = 12 where nome = '048 Florianópolis e região';
+update regions set ordem = 13 where nome = '047 Joinville e Blumenau';
+update regions set ordem = 14 where nome = '047 Balneário Camboriú e região';
+update regions set ordem = 15 where nome = '061 Distrito Federal';
+update regions set ordem = 16 where nome = '062 Goiânia e região';
+update regions set ordem = 17 where nome = '065 Cuiabá e região';
+update regions set ordem = 18 where nome = '068 Rio Branco e região';
+update regions set ordem = 19 where nome = '082 Maceió e região';
+update regions set ordem = 20 where nome = '096 Macapá e região';
+update regions set ordem = 21 where nome = '092 Manaus e região';
+update regions set ordem = 22 where nome = '071 Salvador e região';
+update regions set ordem = 23 where nome = '085 Fortaleza e região';
+update regions set ordem = 24 where nome = '027 Vitória e região';
+update regions set ordem = 25 where nome = '098 São Luís e região';
+update regions set ordem = 26 where nome = '067 Campo Grande e região';
+update regions set ordem = 27 where nome = '031 Belo Horizonte e região';
+update regions set ordem = 28 where nome = '091 Belém e região';
+update regions set ordem = 29 where nome = '083 João Pessoa e região';
+update regions set ordem = 30 where nome = '081 Recife e região';
+update regions set ordem = 31 where nome = '086 Teresina e região';
+update regions set ordem = 32 where nome = '021 Rio de Janeiro e região';
+update regions set ordem = 33 where nome = '084 Natal e região';
+update regions set ordem = 34 where nome = '051 Porto Alegre e região';
+update regions set ordem = 35 where nome = '069 Porto Velho e região';
+update regions set ordem = 36 where nome = '095 Boa Vista e região';
+update regions set ordem = 37 where nome = '079 Aracaju e região';
+update regions set ordem = 38 where nome = '063 Palmas e região';
 select r.nome, count(l.id) as cidades from regions r left join locations l on l.region_id = r.id
  where r.ddd in ('14','15','17') group by r.nome order by r.nome;
 
@@ -1309,4 +1326,66 @@ alter table run_advertisers add column if not exists org_pos_media numeric;
 alter table run_advertisers add column if not exists org_melhor_pos int;
 
 select 'ok' as organico;
+
+-- Robô de Prospecção — nova região do oeste de SP: DDD 018.
+-- Supabase → SQL Editor → New query → colar TUDO → Run. Pode rodar de novo sem problema.
+-- Não apaga nada. Depois, em Configurações, clique em "Validar locais" (grátis).
+
+update regions set ordem = 0 where nome = '011 Capital';
+update regions set ordem = 1 where nome = '011 ABC';
+update regions set ordem = 2 where nome = '011 Grande SP';
+update regions set ordem = 3 where nome = '012 São José dos Campos';
+update regions set ordem = 4 where nome = '013 Baixada Santista';
+update regions set ordem = 5 where nome = '014 Bauru e Marília';
+update regions set ordem = 6 where nome = '015 Sorocaba e região';
+update regions set ordem = 7 where nome = '019 Campinas e região';
+update regions set ordem = 8 where nome = '016 Ribeirão Preto e região';
+update regions set ordem = 9 where nome = '017 São José do Rio Preto e região';
+
+insert into regions (nome, uf, ddd, descricao, ordem) values ('018 Presidente Prudente e Araçatuba', 'SP', '18', 'Oeste paulista', 10)
+  on conflict (nome) do update set uf = excluded.uf, ddd = excluded.ddd, descricao = excluded.descricao, ordem = excluded.ordem;
+insert into locations (region_id, nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
+select r.id, v.* from regions r, (values
+  ('Presidente Prudente', 'Presidente Prudente,State of Sao Paulo,Brazil', 'City', 'minima', '18', null::timestamptz),
+  ('Araçatuba', 'Aracatuba,State of Sao Paulo,Brazil', 'City', 'minima', '18', null::timestamptz),
+  ('Birigui', 'Birigui,State of Sao Paulo,Brazil', 'City', 'media', '18', null::timestamptz),
+  ('Assis', 'Assis,State of Sao Paulo,Brazil', 'City', 'media', '18', null::timestamptz),
+  ('Andradina', 'Andradina,State of Sao Paulo,Brazil', 'City', 'media', '18', null::timestamptz),
+  ('Penápolis', 'Penapolis,State of Sao Paulo,Brazil', 'City', 'ampla', '18', null::timestamptz),
+  ('Adamantina', 'Adamantina,State of Sao Paulo,Brazil', 'City', 'ampla', '18', null::timestamptz),
+  ('Dracena', 'Dracena,State of Sao Paulo,Brazil', 'City', 'ampla', '18', null::timestamptz)
+) as v(nome_exibicao, serpapi_canonical, tipo, camada, ddd_esperado, validado_em)
+where r.nome = '018 Presidente Prudente e Araçatuba'
+on conflict (region_id, serpapi_canonical) do nothing;
+
+update regions set ordem = 11 where nome = '041 Curitiba e região';
+update regions set ordem = 12 where nome = '048 Florianópolis e região';
+update regions set ordem = 13 where nome = '047 Joinville e Blumenau';
+update regions set ordem = 14 where nome = '047 Balneário Camboriú e região';
+update regions set ordem = 15 where nome = '061 Distrito Federal';
+update regions set ordem = 16 where nome = '062 Goiânia e região';
+update regions set ordem = 17 where nome = '065 Cuiabá e região';
+update regions set ordem = 18 where nome = '068 Rio Branco e região';
+update regions set ordem = 19 where nome = '082 Maceió e região';
+update regions set ordem = 20 where nome = '096 Macapá e região';
+update regions set ordem = 21 where nome = '092 Manaus e região';
+update regions set ordem = 22 where nome = '071 Salvador e região';
+update regions set ordem = 23 where nome = '085 Fortaleza e região';
+update regions set ordem = 24 where nome = '027 Vitória e região';
+update regions set ordem = 25 where nome = '098 São Luís e região';
+update regions set ordem = 26 where nome = '067 Campo Grande e região';
+update regions set ordem = 27 where nome = '031 Belo Horizonte e região';
+update regions set ordem = 28 where nome = '091 Belém e região';
+update regions set ordem = 29 where nome = '083 João Pessoa e região';
+update regions set ordem = 30 where nome = '081 Recife e região';
+update regions set ordem = 31 where nome = '086 Teresina e região';
+update regions set ordem = 32 where nome = '021 Rio de Janeiro e região';
+update regions set ordem = 33 where nome = '084 Natal e região';
+update regions set ordem = 34 where nome = '051 Porto Alegre e região';
+update regions set ordem = 35 where nome = '069 Porto Velho e região';
+update regions set ordem = 36 where nome = '095 Boa Vista e região';
+update regions set ordem = 37 where nome = '079 Aracaju e região';
+update regions set ordem = 38 where nome = '063 Palmas e região';
+select r.nome, count(l.id) as cidades from regions r left join locations l on l.region_id = r.id
+ where r.ddd in ('18') group by r.nome order by r.nome;
 
