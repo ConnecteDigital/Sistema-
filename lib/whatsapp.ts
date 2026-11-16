@@ -81,15 +81,34 @@ export async function listarModelos(): Promise<Modelo[]> {
   });
 }
 
+/**
+ * POST /{phone}/messages. A Meta está passando a ligar um número a mais de uma "conta de mensagens"
+ * (account model evolution). Se ela escolher uma que o token não acessa, responde
+ * "(#10) Viewer cannot access the provided Paid Message Account". Nesse caso repetimos UMA vez
+ * dizendo qual conta paga: WHATSAPP_MESSAGING_ACCOUNT_ID (se definida) ou a própria conta (WABA) do sistema.
+ */
+async function postMensagem(corpo: Record<string, unknown>): Promise<{ messages?: { id: string }[] }> {
+  const c = await cfg();
+  const enviar = (extra: Record<string, unknown> = {}) => graph<{ messages?: { id: string }[] }>(`${c.phoneId}/messages`, {
+    method: "POST", body: JSON.stringify({ messaging_product: "whatsapp", ...extra, ...corpo }),
+  });
+  try {
+    return await enviar();
+  } catch (e) {
+    const m = (e as { meta?: ErroMeta }).meta;
+    if (m?.code !== 10 || !/paid message account/i.test(m.message ?? "")) throw e;
+    const conta = process.env.WHATSAPP_MESSAGING_ACCOUNT_ID?.trim() || c.wabaId;
+    console.warn(`[whatsapp] conta de mensagens recusada; repetindo com messaging_account_id=${conta}`);
+    return await enviar({ messaging_account_id: conta });
+  }
+}
+
 /** Envia um modelo aprovado. Devolve o wamid (id da mensagem). */
 export async function enviarModelo(para: string, nome: string, idioma: string, parametros: string[]): Promise<string> {
   const components = parametros.length
     ? [{ type: "body", parameters: parametros.map((t) => ({ type: "text", text: t.slice(0, 1000) || "-" })) }]
     : [];
-  const j = await graph<{ messages?: { id: string }[] }>(`${(await cfg()).phoneId}/messages`, {
-    method: "POST",
-    body: JSON.stringify({ messaging_product: "whatsapp", to: para, type: "template", template: { name: nome, language: { code: idioma }, components } }),
-  });
+  const j = await postMensagem({ to: para, type: "template", template: { name: nome, language: { code: idioma }, components } });
   const id = j.messages?.[0]?.id;
   if (!id) throw new Error("Meta não devolveu o id da mensagem");
   return id;
@@ -97,10 +116,7 @@ export async function enviarModelo(para: string, nome: string, idioma: string, p
 
 /** Texto livre: só funciona até 24h depois da última mensagem do cliente. */
 export async function enviarTexto(para: string, texto: string): Promise<string> {
-  const j = await graph<{ messages?: { id: string }[] }>(`${(await cfg()).phoneId}/messages`, {
-    method: "POST",
-    body: JSON.stringify({ messaging_product: "whatsapp", to: para, type: "text", text: { body: texto.slice(0, 4096) } }),
-  });
+  const j = await postMensagem({ to: para, type: "text", text: { body: texto.slice(0, 4096) } });
   return j.messages?.[0]?.id ?? "";
 }
 
