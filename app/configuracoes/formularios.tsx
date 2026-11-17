@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import { adicionarChave, corrigirPlataformasAcao, validarLocais, type Resultado } from "./actions";
+import { adicionarChave, atualizarRodadasAntigasAcao, corrigirPlataformasAcao, validarLocais, type Resultado } from "./actions";
 
 function Enviar({ children, sec }: { children: React.ReactNode; sec?: boolean }) {
   const { pending } = useFormStatus();
@@ -55,6 +55,16 @@ export function BotaoCorrigirPlataformas() {
   return (
     <form action={acao} className="space-y-2">
       <Enviar sec>Separar sites de plataformas (lovable.app, vercel.app, wix…)</Enviar>
+      <Mensagem r={r} />
+    </form>
+  );
+}
+
+export function BotaoAtualizarRodadas() {
+  const [r, acao] = useActionState(atualizarRodadasAntigasAcao, null);
+  return (
+    <form action={acao} className="space-y-2">
+      <Enviar sec>Atualizar análises das rodadas antigas</Enviar>
       <Mensagem r={r} />
     </form>
   );

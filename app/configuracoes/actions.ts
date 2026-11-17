@@ -181,3 +181,16 @@ export async function corrigirPlataformasAcao(_: Resultado): Promise<Resultado> 
     return { ok: false, msg: e instanceof Error ? e.message : String(e) };
   }
 }
+
+export async function atualizarRodadasAntigasAcao(_: Resultado): Promise<Resultado> {
+  const { atualizarRodadasAntigas } = await import("@/lib/manutencao");
+  try {
+    const r = await atualizarRodadasAntigas();
+    if (!r.feitas.length) return { ok: true, msg: "Tudo em dia: todas as rodadas já têm a presença por cidade." };
+    revalidatePath("/leads"); revalidatePath("/rodadas"); revalidatePath("/relatorios");
+    return { ok: true, msg: `Atualizadas: ${r.feitas.map((x) => "#" + x).join(", ")}.` +
+      (r.faltam ? ` Faltam ${r.faltam} rodada(s): clique de novo até acabar.` : " Pronto, todas atualizadas.") };
+  } catch (e) {
+    return { ok: false, msg: e instanceof Error ? e.message : String(e) };
+  }
+}

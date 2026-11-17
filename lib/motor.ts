@@ -269,7 +269,8 @@ async function todas<T>(consulta: (de: number, ate: number) => PromiseLike<{ dat
   }
 }
 
-async function finalizar(runId: number) {
+/** Lê buscas e anúncios da rodada e agrega por região × anunciante (sem gravar nada). */
+async function agregarDaRodada(runId: number) {
   const { limites } = await lerSettings();
   type LinhaBusca = { id: number; termo: string; locations: { region_id: number; nome_exibicao: string } };
   const buscas = await todas<LinhaBusca>((de, ate) => db().from("run_searches")
@@ -291,6 +292,11 @@ async function finalizar(runId: number) {
     temSitelinks: Array.isArray(a.sitelinks) ? a.sitelinks.length > 0 : !!(a.sitelinks && Object.keys(a.sitelinks as object).length),
   }));
   const agregados = agregar(buscasOk, adsBrutos, limites, new Set((bl ?? []).map((b) => b.dominio)));
+  return { buscas, buscasOk, agregados };
+}
+
+async function finalizar(runId: number) {
+  const { buscas, buscasOk, agregados } = await agregarDaRodada(runId);
   const organico = await lerOrganicoDaRodada(runId, buscasOk);
 
   // Anunciantes (únicos por domínio)
@@ -488,6 +494,32 @@ const resumoSite = (c: LinhaSite): SiteResumo => ({
   tagGoogle: c.tag_google, tagsAw: c.tags_aw ?? [], tagsGtm: c.tags_gtm ?? [],
 });
 
+/** O site fala da palavra que anunciou? Atualiza cada linha da rodada e devolve o resumo por anunciante. */
+async function atualizarPalavraNoSite(linhas: { id: number; advertiser_id: number; termos: string[] | null }[]) {
+  const idsRodada = [...new Set(linhas.map((l) => l.advertiser_id))];
+  const textoPorId = new Map<number, string | null>();
+  for (let i = 0; i < idsRodada.length; i += 50) {
+    const { data } = await db().from("site_checks_recentes").select("advertiser_id, situacao, texto")
+      .in("advertiser_id", idsRodada.slice(i, i + 50));
+    for (const c of data ?? []) textoPorId.set(c.advertiser_id, c.situacao === "ok" ? c.texto : null);
+  }
+  const palavraPorId = new Map<number, { algumOk: boolean; ausentes: Set<string>; verificado: boolean }>();
+  const atualizacoes = linhas.map((l) => {
+    const r = avaliarTermos(textoPorId.get(l.advertiser_id) ?? null, l.termos ?? []);
+    const p = palavraPorId.get(l.advertiser_id) ?? { algumOk: false, ausentes: new Set<string>(), verificado: false };
+    if (r.termoNoSite !== null) p.verificado = true;
+    if (r.termoNoSite) p.algumOk = true;
+    r.ausentes.forEach((t) => p.ausentes.add(t));
+    palavraPorId.set(l.advertiser_id, p);
+    return { id: l.id, termo_no_site: r.termoNoSite, termos_ausentes: r.ausentes };
+  });
+  for (let i = 0; i < atualizacoes.length; i += 20) {
+    await Promise.all(atualizacoes.slice(i, i + 20).map((u) =>
+      db().from("run_advertisers").update({ termo_no_site: u.termo_no_site, termos_ausentes: u.termos_ausentes }).eq("id", u.id)));
+  }
+  return palavraPorId;
+}
+
 export async function gerarLeads(runId: number) {
   type L = { id: number; advertiser_id: number; presenca: number; forca: string; pct_sitelinks: number; duplicado_mesma_busca: number;
     termos: string[]; advertisers: { dominio: string }; regions: { nome: string; ddd: string } };
@@ -516,28 +548,7 @@ export async function gerarLeads(runId: number) {
     consultas.map((c) => ({ dominio: c.advertisers.dominio, cnpjs: cnpjPorId.get(c.advertiser_id)!.cnpjs })),
   );
 
-  // O site fala da palavra que anunciou? (por linha da rodada)
-  const idsRodada = [...new Set(linhas.map((l) => l.advertiser_id))];
-  const textoPorId = new Map<number, string | null>();
-  for (let i = 0; i < idsRodada.length; i += 50) {
-    const { data } = await db().from("site_checks_recentes").select("advertiser_id, situacao, texto")
-      .in("advertiser_id", idsRodada.slice(i, i + 50));
-    for (const c of data ?? []) textoPorId.set(c.advertiser_id, c.situacao === "ok" ? c.texto : null);
-  }
-  const palavraPorId = new Map<number, { algumOk: boolean; ausentes: Set<string>; verificado: boolean }>();
-  const atualizacoes = linhas.map((l) => {
-    const r = avaliarTermos(textoPorId.get(l.advertiser_id) ?? null, l.termos ?? []);
-    const p = palavraPorId.get(l.advertiser_id) ?? { algumOk: false, ausentes: new Set<string>(), verificado: false };
-    if (r.termoNoSite !== null) p.verificado = true;
-    if (r.termoNoSite) p.algumOk = true;
-    r.ausentes.forEach((t) => p.ausentes.add(t));
-    palavraPorId.set(l.advertiser_id, p);
-    return { id: l.id, termo_no_site: r.termoNoSite, termos_ausentes: r.ausentes };
-  });
-  for (let i = 0; i < atualizacoes.length; i += 20) {
-    await Promise.all(atualizacoes.slice(i, i + 20).map((u) =>
-      db().from("run_advertisers").update({ termo_no_site: u.termo_no_site, termos_ausentes: u.termos_ausentes }).eq("id", u.id)));
-  }
+  const palavraPorId = await atualizarPalavraNoSite(linhas);
 
   const grupos = new Map<number, { dominio: string; regioes: PresencaRegiao[] }>();
   for (const l of linhas) {
@@ -579,4 +590,27 @@ export async function reprocessar(runId: number) {
 export async function reagregar(runId: number) {
   await db().from("run_advertisers").delete().eq("run_id", runId);
   await finalizar(runId);
+}
+
+/**
+ * Rodadas antigas: grava a presença por cidade (0014) e refaz a leitura "o site fala do serviço?" com os ramos
+ * parecidos (caça vazamento conta como encanador etc.). Não gasta crédito e não mexe nos leads.
+ */
+export async function atualizarAnaliseDaRodada(runId: number) {
+  const { agregados } = await agregarDaRodada(runId);
+  type L = { id: number; advertiser_id: number; region_id: number; termos: string[] | null; advertisers: { dominio: string } };
+  const linhas = await todas<L>((de, ate) => db().from("run_advertisers")
+    .select("id, advertiser_id, region_id, termos, advertisers(dominio)").eq("run_id", runId).order("id").range(de, ate) as never);
+  const porChave = new Map(agregados.map((a) => [`${a.regionId}|${a.dominio}`, a.porPonto]));
+  for (let i = 0; i < linhas.length; i += 20) {
+    const res = await Promise.all(linhas.slice(i, i + 20).map((l) => {
+      const pp = porChave.get(`${l.region_id}|${l.advertisers.dominio}`);
+      // sem dado (ex.: domínio bloqueado depois): grava lista vazia para não ficar pendente para sempre
+      return db().from("run_advertisers").update({ por_ponto: pp ?? [] }).eq("id", l.id);
+    }));
+    const erro = res.find((r) => r.error)?.error;
+    if (erro) throw new Error(/por_ponto/.test(erro.message) ? "Rode antes o 0014_presenca_por_cidade.sql no Supabase." : erro.message);
+  }
+  await atualizarPalavraNoSite(linhas);
+  return linhas.length;
 }

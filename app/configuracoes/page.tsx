@@ -2,7 +2,7 @@ import { db } from "@/lib/supabase";
 import { variaveisFaltando } from "@/lib/env";
 import { formatarData } from "@/lib/utils";
 import { AvisoConfiguracao } from "@/components/aviso-configuracao";
-import { BotaoCorrigirPlataformas, BotaoEnviar, BotaoValidarLocais, FormNovaChave } from "./formularios";
+import { BotaoAtualizarRodadas, BotaoCorrigirPlataformas, BotaoEnviar, BotaoValidarLocais, FormNovaChave } from "./formularios";
 import {
   adicionarNicho, adicionarPessoa, adicionarVariacao, alternarChave, removerVariacao, atualizarTodosCreditos, excluirChave, removerPessoa, salvarLimiteTroca,
 } from "./actions";
@@ -218,6 +218,11 @@ export default async function Configuracoes() {
           diferentes. Este botão separa cada site, refaz as rodadas afetadas e apaga o anunciante misturado. Não gasta crédito da SerpApi.
         </p>
         <BotaoCorrigirPlataformas />
+        <p className="pt-2 text-sm text-suave">
+          Rodadas feitas antes da presença por cidade: calcula a força só nas cidades onde cada anunciante anuncia e refaz a leitura
+          do site com serviços do mesmo ramo (caça vazamento e hidráulica contam como encanador). Não gasta crédito e não mexe nos leads.
+        </p>
+        <BotaoAtualizarRodadas />
       </section>
     </main>
   );

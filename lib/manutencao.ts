@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "./supabase";
 import { PLATAFORMAS, identificarAnunciante } from "./dominio";
-import { reagregar } from "./motor";
+import { atualizarAnaliseDaRodada, reagregar } from "./motor";
 
 /**
  * Corrige anunciantes que foram agrupados pelo domínio da plataforma (ex.: todos os sites "*.lovable.app"
@@ -44,4 +44,20 @@ export async function corrigirPlataformas(): Promise<{ sites: string[]; rodadas:
   await db().from("advertisers").delete().in("id", advIds);
 
   return { sites: [...porNovo.keys()].sort(), rodadas, anuncios: ads.length };
+}
+
+/**
+ * Atualiza as rodadas antigas com a presença por cidade e a nova leitura do site (ramos parecidos).
+ * Faz até `porVez` rodadas por clique (para não estourar o tempo) e diz quantas faltam.
+ */
+export async function atualizarRodadasAntigas(porVez = 4): Promise<{ feitas: number[]; faltam: number }> {
+  const { data, error } = await db().from("run_advertisers").select("run_id").is("por_ponto", null).limit(10000);
+  if (error) throw new Error(/por_ponto/.test(error.message) ? "Rode antes o 0014_presenca_por_cidade.sql no Supabase." : error.message);
+  const pendentes = [...new Set((data ?? []).map((r) => r.run_id as number))].sort((a, b) => b - a);
+  const feitas: number[] = [];
+  for (const runId of pendentes.slice(0, porVez)) {
+    await atualizarAnaliseDaRodada(runId);
+    feitas.push(runId);
+  }
+  return { feitas, faltam: Math.max(0, pendentes.length - feitas.length) };
 }
