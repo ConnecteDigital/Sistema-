@@ -12,7 +12,11 @@ export type Agregado = {
   presenca: number; pontos: string[]; termos: string[]; posMedia: number | null; pctTopo: number;
   pctSitelinks: number; titulo: string | null; link: string | null; forca: "Fraca" | "Média" | "Forte";
   duplicadoMesmaBusca: number;
+  porPonto: PorPonto[];   // cada cidade da região: buscas feitas lá e em quantas ele apareceu
 };
+
+/** Presença numa cidade (ponto) da região. p = nome, b = buscas feitas lá, a = buscas em que apareceu. */
+export type PorPonto = { p: string; b: number; a: number };
 
 export function forcaDe(presenca: number, l: Limites): "Fraca" | "Média" | "Forte" {
   if (presenca < l.fraca_ate) return "Fraca";
@@ -32,6 +36,13 @@ export function agregar(buscas: BuscaOk[], ads: AdBruto[], limites: Limites, blo
   const buscaPorId = new Map(buscas.map((b) => [b.id, b]));
   const buscasPorRegiao = new Map<number, number>();
   for (const b of buscas) buscasPorRegiao.set(b.regionId, (buscasPorRegiao.get(b.regionId) ?? 0) + 1);
+  // buscas por cidade dentro da região (para medir a força só onde ele anuncia)
+  const pontosDaRegiao = new Map<number, Map<string, number>>();
+  for (const b of buscas) {
+    if (!pontosDaRegiao.has(b.regionId)) pontosDaRegiao.set(b.regionId, new Map());
+    const m = pontosDaRegiao.get(b.regionId)!;
+    m.set(b.ponto, (m.get(b.ponto) ?? 0) + 1);
+  }
 
   const grupos = new Map<string, { regionId: number; dominio: string; ads: AdBruto[] }>();
   for (const ad of ads) {
@@ -53,6 +64,10 @@ export function agregar(buscas: BuscaOk[], ads: AdBruto[], limites: Limites, blo
     }
     const buscasRegiao = buscasPorRegiao.get(g.regionId) ?? 0;
     const presenca = buscasRegiao ? combos.size / buscasRegiao : 0;
+    const apPorPonto = new Map<string, number>();
+    for (const c of combos) { const ponto = c.split("|")[0]; apPorPonto.set(ponto, (apPorPonto.get(ponto) ?? 0) + 1); }
+    const porPonto = [...(pontosDaRegiao.get(g.regionId) ?? new Map<string, number>())]
+      .map(([p, b]) => ({ p, b, a: apPorPonto.get(p) ?? 0 })).sort((x, y) => x.p.localeCompare(y.p));
     const posicoes = g.ads.map((a) => a.position).filter((p): p is number => typeof p === "number");
     saida.push({
       regionId: g.regionId, dominio: g.dominio, nome: maisFrequente(g.ads.map((a) => a.source)),
@@ -64,6 +79,7 @@ export function agregar(buscas: BuscaOk[], ads: AdBruto[], limites: Limites, blo
       titulo: maisFrequente(g.ads.map((a) => a.title)), link: maisFrequente(g.ads.map((a) => a.link)),
       forca: forcaDe(presenca, limites),
       duplicadoMesmaBusca: [...porBusca.values()].filter((n) => n > 1).length,
+      porPonto,
     });
   }
   return saida.sort((a, b) => a.regionId - b.regionId || b.presenca - a.presenca);

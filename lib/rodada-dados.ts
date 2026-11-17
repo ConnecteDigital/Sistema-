@@ -14,6 +14,9 @@ const ORG = "org_buscas, org_aparicoes, org_presenca, org_pos_media, org_melhor_
 
 /** Linhas da rodada. Funciona mesmo se o 0006 (palavra-chave errada) ainda não foi rodado no banco. */
 export async function buscarLinhasBanco(runId: number): Promise<LinhaBanco[]> {
+  // banco com o 0014 (presença por cidade)
+  const ponto = await db().from("run_advertisers").select(BASE + ", termo_no_site, termos_ausentes, " + ORG + ", por_ponto").eq("run_id", runId).limit(5000);
+  if (!ponto.error) return (ponto.data ?? []) as unknown as LinhaBanco[];
   const org = await db().from("run_advertisers").select(BASE + ", termo_no_site, termos_ausentes, " + ORG).eq("run_id", runId).limit(5000);
   if (!org.error) return (org.data ?? []) as unknown as LinhaBanco[];
   // banco sem o 0013 (orgânico): segue sem
@@ -59,6 +62,7 @@ export async function montarLinhas(listaA: LinhaBanco[], pronta: boolean): Promi
     termoNoSite: a.termo_no_site ?? null, termosAusentes: a.termos_ausentes ?? [],
     porRodada: a.por_rodada,
     organico: organicoDaLinha(a),
+    porPonto: a.por_ponto ?? null,
   }));
   const grupos = agruparDonos([...new Map(linhas.map((l) => [l.advertiserId, l])).values()].map((l) => ({
     id: l.advertiserId, cnpjs: l.cnpjs, telefones: [l.telefone, ...l.outrosTelefones].filter((t): t is string => !!t), tags: l.tags,

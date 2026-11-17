@@ -10,7 +10,8 @@ const pct = (v: number) => `${Math.round(v * 100)}%`;
 const analiseDo = (d: Dono) => {
   const l = d.principal;
   return analisarAnuncio([{ regiao: l.regiao, presenca: l.presenca, aparicoes: l.aparicoes, buscas: l.buscas,
-    posMedia: l.pos_media, pctTopo: l.pct_topo, pontos: l.pontos ?? [], termos: l.termos ?? [], organico: l.organico }]);
+    posMedia: l.pos_media, pctTopo: l.pct_topo, pontos: l.pontos ?? [], termos: l.termos ?? [], organico: l.organico,
+    porPonto: (l.porPonto ?? null)?.map((x) => ({ ponto: x.p, buscas: x.b, aparicoes: x.a })) ?? null }]);
 };
 
 export function RelatorioLigacao({ linhas, semResumo = false, titulo = "Relatório — quem ligar" }: { linhas: Linha[]; semResumo?: boolean; titulo?: string }) {

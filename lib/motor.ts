@@ -313,10 +313,16 @@ async function finalizar(runId: number) {
     pct_topo: Number(a.pctTopo.toFixed(4)), pct_sitelinks: Number(a.pctSitelinks.toFixed(4)),
     titulo: a.titulo, link: a.link, forca: a.forca, duplicado_mesma_busca: a.duplicadoMesmaBusca,
     ...(organico ? camposOrganico(organicoDe(a.regionId, a.dominio, organico)) : {}),
+    por_ponto: a.porPonto,
   }));
   for (let i = 0; i < linhas.length; i += 500) {
-    const { error } = await db().from("run_advertisers")
-      .upsert(linhas.slice(i, i + 500), { onConflict: "run_id,region_id,advertiser_id" });
+    const lote = linhas.slice(i, i + 500);
+    let { error } = await db().from("run_advertisers").upsert(lote, { onConflict: "run_id,region_id,advertiser_id" });
+    // banco sem o 0014 (presença por cidade): grava sem essa coluna
+    if (error && /por_ponto/.test(error.message)) {
+      ({ error } = await db().from("run_advertisers")
+        .upsert(lote.map(({ por_ponto: _, ...resto }) => resto), { onConflict: "run_id,region_id,advertiser_id" }));
+    }
     if (error) throw new Error(error.message);
   }
 

@@ -7,7 +7,20 @@ export type Aparicao = {
   presenca: number; aparicoes: number; buscas: number; posMedia: number | null; pctTopo?: number | null;
   pontos: string[]; termos: string[];
   organico?: Organico | null;   // null/undefined = orgânico não medido nesta rodada
+  porPonto?: { ponto: string; buscas: number; aparicoes: number }[] | null;   // cada cidade da região (null = rodada antiga)
 };
+
+/** Onde ele anuncia: as cidades da região em que apareceu, quando ele NÃO aparece na região toda. */
+type Foco = { cidades: string[]; buscas: number; aparicoes: number; presenca: number; outras: string[];
+  detalhe: { ponto: string; buscas: number; aparicoes: number }[] };
+function focoDe(a: Aparicao): Foco | null {
+  const pp = (a.porPonto ?? []).filter((x) => x.buscas > 0);
+  const com = pp.filter((x) => x.aparicoes > 0), sem = pp.filter((x) => x.aparicoes === 0);
+  if (!com.length || !sem.length) return null;   // aparece em todas (ou em nenhuma): não há foco
+  const buscas = com.reduce((s, x) => s + x.buscas, 0), aparicoes = com.reduce((s, x) => s + x.aparicoes, 0);
+  return { cidades: com.map((x) => x.ponto), buscas, aparicoes, presenca: buscas ? aparicoes / buscas : 0,
+    outras: sem.map((x) => x.ponto), detalhe: com };
+}
 
 export type Analise = {
   resumo: string;          // uma frase: o retrato (pago + orgânico)
@@ -73,11 +86,28 @@ export function analisarAnuncio(aparicoes: Aparicao[]): Analise | null {
   const quando = b.rodada ? `Na rodada #${b.rodada}` : "Nesta pesquisa";
   const regiao = b.regiao.replace(/^\d{3}\s+/, "");
   const fora = b.buscas - b.aparicoes;
+  // Ele anuncia só em algumas cidades da região? Então a força que importa é a medida LÁ.
+  const f = focoDe(b);
+  const usaFoco = !!f && !pequena && p < 0.75 && f.buscas >= AMOSTRA_MINIMA;
+  const P = usaFoco ? f!.presenca : p;
+  const BB = usaFoco ? f!.buscas : b.buscas;
+  const AA = usaFoco ? f!.aparicoes : b.aparicoes;
+  const ONDE = usaFoco ? `em ${lista(f!.cidades)}, onde você anuncia` : "na sua região";
+  const forcaDaPresenca = (x: number) => (x < 0.4 ? "fraca" : x <= 0.75 ? "média" : "forte");
 
   // --- O que os números dizem ---
   leitura.push(`${quando} o robô fez ${b.buscas} ${b.buscas === 1 ? "busca" : "buscas"} em ${b.regiao} e o anúncio pago apareceu em ${b.aparicoes} (${pct(p)}).`.replace(b.regiao, regiao));
+  if (f && !pequena) {
+    leitura.push(`Ele só apareceu em ${lista(f.cidades)}. Contando só ${f.cidades.length === 1 ? "essa cidade" : "essas cidades"}: ` +
+      `${f.buscas} buscas e o anúncio apareceu em ${f.aparicoes} (${pct(f.presenca)}), presença ${forcaDaPresenca(f.presenca)} onde ele anuncia` +
+      (f.buscas < AMOSTRA_MINIMA ? " (amostra pequena)." : "."));
+    if (f.detalhe.length > 1) leitura.push(`Por cidade: ${f.detalhe.map((x) => `${x.ponto} ${x.aparicoes}/${x.buscas}`).join(", ")}.`);
+    leitura.push(`Nas outras cidades da região (${lista(f.outras)}) não apareceu.`);
+  }
   if (pequena) {
     leitura.push(`Amostra pequena: com só ${b.buscas} ${b.buscas === 1 ? "busca" : "buscas"} não dá para dizer se a presença é forte ou fraca. Repita a pesquisa com mais palavras-chave ou mais cidades antes de usar esse número na conversa.`);
+  } else if (p < 0.4 && f) {
+    leitura.push(`Na região inteira (todas as cidades), ficou de fora de ${fora} das ${b.buscas} buscas.`);
   } else if (p < 0.4) {
     leitura.push(`Ficou de fora de ${fora} das ${b.buscas} buscas: quem procura o serviço na região quase nunca vê esse anúncio.`);
   } else if (p <= 0.75) {
@@ -90,7 +120,9 @@ export function analisarAnuncio(aparicoes: Aparicao[]): Analise | null {
     else if (atras) leitura.push(`Quando aparece, fica em média na posição ${pos.toFixed(1).replace(".", ",")} (1 = primeiro anúncio): tem concorrente pagando mais ou com anúncio melhor na frente.`);
     else leitura.push(`Quando aparece, fica entre o 1º e o 2º lugar (posição média ${pos.toFixed(1).replace(".", ",")}).`);
   }
-  if (b.aparicoes > 0) {
+  if (b.aparicoes > 0 && f && !pequena) {
+    if (b.termos.length) leitura.push(`Apareceu para ${b.termos.length === 1 ? "a busca" : "as buscas"} ${lista(b.termos.map((t) => `"${t}"`))}.`);
+  } else if (b.aparicoes > 0) {
     leitura.push(`Apareceu ${umPonto ? "só" : ""} em ${lista(b.pontos)}${b.termos.length ? `, para ${b.termos.length === 1 ? "a busca" : "as buscas"} ${lista(b.termos.map((t) => `"${t}"`))}` : ""}.`.replace("  ", " "));
   }
 
@@ -110,17 +142,21 @@ export function analisarAnuncio(aparicoes: Aparicao[]): Analise | null {
   let abordagem: string;
   if (pequena) {
     abordagem = "Ainda não use a presença como argumento: repita a pesquisa nessa região com mais buscas. Enquanto isso, use os outros pontos (site, conversões, palavra-chave).";
-  } else if (p < 0.4 && !atras) {
+  } else if (usaFoco && P > 0.75) {
+    abordagem = `Em ${lista(f!.cidades)}, onde você anuncia, o seu anúncio aparece em ${AA} de ${BB} buscas: lá está forte. ` +
+      `Nas cidades vizinhas (${lista(f!.outras)}) ele não aparece. Se você também atende essas cidades, são clientes procurando o seu serviço e ligando para outra empresa.`;
+    if (atras) abordagem += ` E, quando aparece, fica atrás de concorrentes (posição média ${pos!.toFixed(1).replace(".", ",")}).`;
+  } else if (P < 0.4 && !atras) {
     causas.push("Verba diária acabando cedo (o anúncio some no resto do dia).",
-      umPonto ? `Área do anúncio configurada só para ${b.pontos[0]}.` : "Área do anúncio menor que a região que ele atende.",
+      usaFoco ? "Lance ou horário de veiculação limitados." : umPonto ? `Área do anúncio configurada só para ${b.pontos[0]}.` : "Área do anúncio menor que a região que ele atende.",
       "Poucas palavras-chave (não aparece em buscas parecidas).");
-    abordagem = `Fizemos ${b.buscas} buscas na sua região e o seu anúncio só apareceu em ${b.aparicoes}.${noTopo ? " Quando aparece, fica em 1º lugar, então o problema não é a qualidade do anúncio: é verba, horário ou área configurada." : ""} Dá para aparecer muito mais sem necessariamente gastar mais.`;
-  } else if (p < 0.4 && atras) {
-    causas.push("Lance baixo ou anúncio com nota de qualidade fraca: perde o leilão para os concorrentes.", "Verba curta e área ou palavras-chave limitadas.");
-    abordagem = `Fizemos ${b.buscas} buscas na sua região: o seu anúncio apareceu em ${b.aparicoes} e, quando apareceu, ficou atrás dos concorrentes. Quem procura o serviço está ligando para eles primeiro. Dá para melhorar o anúncio e a página para aparecer mais e pagar menos por clique.`;
-  } else if (p <= 0.75) {
-    causas.push("Verba que não cobre o dia todo ou lance no limite.", "Algumas palavras-chave ou cidades de fora da campanha.");
-    abordagem = `O seu anúncio fica de fora em ${deCada10(p)} de cada 10 buscas na sua região${atras ? " e, quando aparece, fica atrás de concorrentes" : ""}. São clientes procurando o seu serviço e encontrando outra empresa. Dá para cobrir esse buraco ajustando a campanha.`;
+    abordagem = `Fizemos ${BB} buscas ${ONDE} e o seu anúncio só apareceu em ${AA}.${noTopo ? ` Quando aparece, fica em 1º lugar, então o problema não é a qualidade do anúncio: é verba, horário${usaFoco ? "" : " ou área configurada"}.` : ""} Dá para aparecer muito mais sem necessariamente gastar mais.`;
+  } else if (P < 0.4 && atras) {
+    causas.push("Lance baixo ou anúncio com nota de qualidade fraca: perde o leilão para os concorrentes.", usaFoco ? "Verba curta ou poucas palavras-chave." : "Verba curta e área ou palavras-chave limitadas.");
+    abordagem = `Fizemos ${BB} buscas ${ONDE}: o seu anúncio apareceu em ${AA} e, quando apareceu, ficou atrás dos concorrentes. Quem procura o serviço está ligando para eles primeiro. Dá para melhorar o anúncio e a página para aparecer mais e pagar menos por clique.`;
+  } else if (P <= 0.75) {
+    causas.push("Verba que não cobre o dia todo ou lance no limite.", usaFoco ? "Algumas palavras-chave de fora da campanha." : "Algumas palavras-chave ou cidades de fora da campanha.");
+    abordagem = `O seu anúncio fica de fora em ${deCada10(P)} de cada 10 buscas ${ONDE}${atras ? " e, quando aparece, fica atrás de concorrentes" : ""}. São clientes procurando o seu serviço e encontrando outra empresa. Dá para cobrir esse buraco ajustando a campanha.`;
   } else if (atras) {
     causas.push("Concorrentes com lance maior ou anúncio melhor avaliado.");
     abordagem = `Seu anúncio aparece quase sempre, mas fica atrás de concorrentes (posição média ${pos!.toFixed(1).replace(".", ",")}). Melhorando a qualidade do anúncio e da página dá para subir de posição sem aumentar o lance.`;
@@ -147,7 +183,12 @@ export function analisarAnuncio(aparicoes: Aparicao[]): Analise | null {
   if (orgPequena) organico.push(`Amostra pequena (${o!.buscas} ${o!.buscas === 1 ? "busca" : "buscas"}): confira no Google antes de citar esse número.`);
 
   // O que falar, levando o orgânico em conta (só com amostra suficiente nos dois)
-  if (o && !pequena && !orgPequena) {
+  if (o && usaFoco && !orgPequena && (fo === "ausente" || fo === "fraca")) {
+    abordagem += fo === "ausente"
+      ? ` E no orgânico o seu site não apareceu na 1ª página em nenhuma das ${o.buscas} buscas da região.`
+      : ` E no orgânico o site aparece pouco (em ${o.aparicoes} das ${o.buscas} buscas da região).`;
+  }
+  if (o && !usaFoco && !pequena && !orgPequena) {
     const posOrg = o.posMedia !== null ? `, em média na posição ${num(o.posMedia)}` : "";
     if ((fo === "forte" || fo === "media") && p <= 0.75) {
       const final = p < 0.4 && !atras ? "Dá para o seu anúncio aparecer muito mais sem necessariamente gastar mais."
@@ -175,12 +216,18 @@ export function analisarAnuncio(aparicoes: Aparicao[]): Analise | null {
   if (!o && !pequena && p < 0.75) {
     cuidados.push("O orgânico não foi medido nesta rodada. Antes de falar em presença fraca, pesquise o serviço no Google e veja se o site dele aparece abaixo dos anúncios: se aparecer bem, fale só do anúncio pago.");
   }
-  if (!pequena && p < 0.75 && umPonto) cuidados.push(`Se ele atende só ${b.pontos[0]} de propósito, é normal não aparecer nas outras cidades. Pergunte isso antes de afirmar que está perdendo clientes.`);
-  if (!pequena && p < 0.75) cuidados.push("Pergunte se a verba acaba antes do fim do dia: é a causa mais comum e ele costuma saber.");
+  if (usaFoco) {
+    cuidados.push(`Ele parece anunciar de propósito só em ${lista(f!.cidades)}: o "O que falar" já usa só ${f!.cidades.length === 1 ? "essa cidade" : "essas cidades"}. ` +
+      `Pergunte se ele também atende ${lista(f!.outras)} antes de falar das outras cidades.`);
+  } else if (!pequena && p < 0.75 && umPonto) {
+    cuidados.push(`Se ele atende só ${b.pontos[0]} de propósito, é normal não aparecer nas outras cidades. Pergunte isso antes de afirmar que está perdendo clientes.`);
+  }
+  if (!pequena && P < 0.75) cuidados.push("Pergunte se a verba acaba antes do fim do dia: é a causa mais comum e ele costuma saber.");
 
   const forcaTxt = pequena ? "amostra pequena" : p < 0.4 ? "presença fraca" : p <= 0.75 ? "presença média" : "presença forte";
   const posTxt = pos === null ? "" : noTopo ? ", em 1º quando aparece" : atras ? ", atrás de concorrentes" : "";
-  const resumo = `Anúncio pago: ${pct(p)} (${b.aparicoes}/${b.buscas}) em ${regiao}, ${forcaTxt}${posTxt}. Orgânico: ${resumoOrganico(o)}.`;
+  const focoTxt = usaFoco ? ` Em ${lista(f!.cidades)} (onde anuncia): ${pct(P)} (${AA}/${BB}), presença ${forcaDaPresenca(P)}.` : "";
+  const resumo = `Anúncio pago: ${pct(p)} (${b.aparicoes}/${b.buscas}) em ${regiao}, ${forcaTxt}${posTxt}.${focoTxt} Orgânico: ${resumoOrganico(o)}.`;
   return { resumo, leitura, organico, causas, abordagem, cuidados, amostraPequena: pequena };
 }
 

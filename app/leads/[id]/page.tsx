@@ -18,7 +18,10 @@ const CAMPOS_HIST = "run_id, presenca, aparicoes, buscas, forca, pos_media, pct_
 async function historicoDo(advertiserId: number) {
   const consulta = (campos: string) => db().from("run_advertisers").select(campos)
     .eq("advertiser_id", advertiserId).order("run_id", { ascending: false }).limit(50);
-  const com = await consulta(CAMPOS_HIST + ", org_buscas, org_aparicoes, org_presenca, org_pos_media, org_melhor_pos");
+  const ORG = ", org_buscas, org_aparicoes, org_presenca, org_pos_media, org_melhor_pos";
+  const ponto = await consulta(CAMPOS_HIST + ORG + ", por_ponto");
+  if (!ponto.error) return ponto;
+  const com = await consulta(CAMPOS_HIST + ORG);
   return com.error ? consulta(CAMPOS_HIST) : com;
 }
 
@@ -51,6 +54,7 @@ export default async function Lead({ params }: { params: Promise<{ id: string }>
     rodada: h.run_id, data: h.runs.criado_em, regiao: h.regions.nome, presenca: Number(h.presenca), aparicoes: h.aparicoes,
     buscas: h.buscas, posMedia: h.pos_media === null ? null : Number(h.pos_media), pctTopo: Number(h.pct_topo),
     pontos: h.pontos ?? [], termos: h.termos ?? [], organico: organicoDaLinha(h),
+    porPonto: h.por_ponto?.map((x) => ({ ponto: x.p, buscas: x.b, aparicoes: x.a })) ?? null,
   })));
 
   return (

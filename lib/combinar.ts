@@ -1,5 +1,5 @@
 // Junta várias rodadas num relatório só, sem repetir anunciante, e compara os horários. Pura.
-import { forcaDe, type Limites, type Organico } from "./agregacao";
+import { forcaDe, type Limites, type Organico, type PorPonto } from "./agregacao";
 
 export type LinhaRodada = {
   id: number; advertiser_id: number; aparicoes: number; buscas: number; presenca: number; pontos: string[]; termos: string[];
@@ -9,6 +9,7 @@ export type LinhaRodada = {
   por_rodada?: { rodada: number; presenca: number | null }[];
   org_buscas?: number | null; org_aparicoes?: number | null; org_presenca?: number | null;
   org_pos_media?: number | null; org_melhor_pos?: number | null;
+  por_ponto?: PorPonto[] | null;   // null = rodada antiga (antes do 0014)
 };
 
 /** Orgânico da linha do banco (null = não medido). */
@@ -26,6 +27,13 @@ export function combinarRodadas(rodadas: { rodada: number; linhas: LinhaRodada[]
   // total de buscas por rodada × região (igual em todas as linhas da região)
   const totais = new Map<string, number>();
   for (const r of ordem) for (const l of r.linhas) totais.set(`${r.rodada}|${l.regions.nome}`, Number(l.buscas));
+
+  // buscas por cidade em cada rodada × região (qualquer linha da região traz todas as cidades)
+  const buscasPonto = new Map<string, Map<string, number>>();
+  for (const r of ordem) for (const l of r.linhas) {
+    const k = `${r.rodada}|${l.regions.nome}`;
+    if (!buscasPonto.has(k) && l.por_ponto?.length) buscasPonto.set(k, new Map(l.por_ponto.map((x) => [x.p, x.b])));
+  }
 
   const grupos = new Map<string, { rodada: number; l: LinhaRodada }[]>();
   for (const r of ordem) for (const l of r.linhas) {
@@ -52,6 +60,19 @@ export function combinarRodadas(rodadas: { rodada: number; linhas: LinhaRodada[]
     const orgComPos = orgs.filter((o) => o.posMedia !== null && o.aparicoes > 0);
     const orgApPos = orgComPos.reduce((s, o) => s + o.aparicoes, 0);
     const melhores = orgs.map((o) => o.melhorPos).filter((p): p is number => p !== null);
+    // por cidade: só se todas as rodadas da região tiverem o dado (senão o total de buscas ficaria errado)
+    const rodadasRegiao = ordem.filter((r) => totais.has(`${r.rodada}|${regiao}`));
+    let porPonto: PorPonto[] | null = null;
+    if (rodadasRegiao.every((r) => buscasPonto.has(`${r.rodada}|${regiao}`))) {
+      const soma = new Map<string, PorPonto>();
+      for (const r of rodadasRegiao) for (const [p, b] of buscasPonto.get(`${r.rodada}|${regiao}`)!) {
+        const x = soma.get(p) ?? { p, b: 0, a: 0 };
+        x.b += b;
+        x.a += itens.find((i) => i.rodada === r.rodada)?.l.por_ponto?.find((q) => q.p === p)?.a ?? 0;
+        soma.set(p, x);
+      }
+      porPonto = [...soma.values()].sort((x, y) => x.p.localeCompare(y.p));
+    }
     saida.push({
       ...ultima,
       aparicoes: ap, buscas, presenca, forca: forcaDe(presenca, limites),
@@ -67,6 +88,7 @@ export function combinarRodadas(rodadas: { rodada: number; linhas: LinhaRodada[]
       org_presenca: orgBuscas ? orgAp / orgBuscas : null,
       org_pos_media: orgApPos ? orgComPos.reduce((s, o) => s + o.posMedia! * o.aparicoes, 0) / orgApPos : null,
       org_melhor_pos: melhores.length ? Math.min(...melhores) : null,
+      por_ponto: porPonto,
       por_rodada: ordem.map((r) => {
         const x = itens.find((i) => i.rodada === r.rodada);
         if (x) return { rodada: r.rodada, presenca: Number(x.l.presenca) };

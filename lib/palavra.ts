@@ -17,12 +17,35 @@ export function radicais(termo: string): string[] {
     .map((p) => p.slice(0, Math.min(p.length, 7)));
 }
 
-/** true = o site menciona o termo; false = não menciona; null = não dá para afirmar (sem texto suficiente). */
+/**
+ * Ramos parecidos: quem anuncia "encanador" e no site fala de "caça vazamento" ou "hidráulica" está no ramo certo.
+ * Cada família lista inícios de palavra (já sem acento). Se o termo cai numa família, vale qualquer palavra dela.
+ */
+export const FAMILIAS: string[][] = [
+  // encanamento / hidráulica / vazamento
+  ["encanad", "encanam", "hidraul", "vazamen", "tubulac", "caca vaz", "bombeiro hidr", "infiltrac", "geofon"],
+  // desentupimento / esgoto / fossa
+  ["desentu", "entupi", "esgoto", "fossa", "hidrojat", "caixa de gordura", "sumidour", "sugador", "limpa fossa"],
+  // elétrica
+  ["eletric", "eletrot", "instalacao eletr", "quadro de distrib", "padrao de energ"],
+  // serralheria
+  ["serralh", "portao", "portoes", "grade", "esquadri", "estrutura metal"],
+];
+
+function familiaDe(radical: string): string[] | null {
+  for (const f of FAMILIAS) {
+    if (f.some((x) => !x.includes(" ") && (radical.startsWith(x) || x.startsWith(radical)))) return f;
+  }
+  return null;
+}
+
+/** true = o site menciona o termo (ou um serviço do mesmo ramo); false = não menciona; null = não dá para afirmar. */
 export function siteFalaDoTermo(textoNormalizado: string | null, termo: string): boolean | null {
   if (!textoNormalizado || textoNormalizado.length < 400) return null;
   const rs = radicais(termo);
   if (!rs.length) return null;
-  return rs.some((r) => new RegExp(`\\b${r}`).test(textoNormalizado));
+  const tem = (x: string) => new RegExp(`\\b${x.replace(/ /g, "\\s+")}`).test(textoNormalizado);
+  return rs.some((r) => tem(r) || (familiaDe(r) ?? []).some(tem));
 }
 
 /** Avalia todos os termos em que o anunciante apareceu. ausentes = termos que o site não menciona. */

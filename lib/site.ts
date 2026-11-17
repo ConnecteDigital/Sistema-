@@ -129,6 +129,10 @@ export function analisarPagina(p: Pagina): Analise {
       html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "",
       html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)/i)?.[1] ?? "",
       textoVisivel(html),
+      // menus e imagens também dizem o que a empresa faz: textos alternativos e caminhos dos links
+      // (ex.: <img alt="Caça vazamento">, href="/servicos/encanamento")
+      ...[...html.matchAll(/\b(?:alt|title)=["']([^"']{2,200})["']/gi)].map((m) => m[1]),
+      ...[...html.matchAll(/href=["'](?:https?:\/\/[^/"']+)?\/([^"'#?]{2,200})/gi)].map((m) => m[1].replace(/[/_.-]+/g, " ")),
     ].join(" ")).slice(0, 50_000),
   };
 }

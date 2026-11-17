@@ -1,5 +1,5 @@
 import type { CnpjSalvo } from "@/components/consulta-cnpj";
-import type { Organico } from "./agregacao";
+import type { Organico, PorPonto } from "./agregacao";
 
 // Uma linha da rodada: anunciante × região, já com lead, site e CNPJ.
 export type Linha = {
@@ -13,4 +13,5 @@ export type Linha = {
   termoNoSite: boolean | null; termosAusentes: string[];
   porRodada?: { rodada: number; presenca: number | null }[];   // só no relatório de várias rodadas
   organico: Organico | null;   // site no orgânico na mesma região (null = não medido nesta rodada)
+  porPonto: PorPonto[] | null; // presença em cada cidade da região (null = rodada antiga)
 };
