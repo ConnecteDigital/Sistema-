@@ -24,6 +24,10 @@ export default async function Configuracoes() {
   // Rodadas antigas ainda sem a presença por cidade? (erro = banco sem o 0014: mostra o botão mesmo assim)
   const pendentesCidade = await db().from("run_advertisers").select("id", { count: "exact", head: true }).is("por_ponto", null);
   const faltaAtualizar = !!pendentesCidade.error || (pendentesCidade.count ?? 0) > 0;
+  // Ainda tem anunciante misturado pelo domínio da plataforma (ex.: "lovable.app")?
+  const { PLATAFORMAS } = await import("@/lib/dominio");
+  const misturados = await db().from("advertisers").select("id", { count: "exact", head: true }).in("dominio", PLATAFORMAS);
+  const faltaSeparar = !!misturados.error || (misturados.count ?? 0) > 0;
   const [chaves, equipe, regioes, locais, nichos] = await Promise.all([
     db().from("serp_keys").select("*").order("id"),
     db().from("equipe").select("id, nome").eq("ativo", true).order("nome"),
@@ -216,11 +220,17 @@ export default async function Configuracoes() {
       {/* Manutenção */}
       <section className="cartao space-y-2 p-4 sm:p-5">
         <h2 className="font-semibold">Manutenção</h2>
-        <p className="text-sm text-suave">
+        {faltaSeparar ? (
+          <>
+            <p className="text-sm text-suave">
           Sites feitos em plataformas (Lovable, Vercel, Wix, Blogspot…) eram agrupados pelo domínio da plataforma, misturando empresas
           diferentes. Este botão separa cada site, refaz as rodadas afetadas e apaga o anunciante misturado. Não gasta crédito da SerpApi.
         </p>
         <BotaoCorrigirPlataformas />
+          </>
+        ) : (
+          <p className="text-sm text-green-700">✓ Nenhum site de plataforma (Lovable, Vercel, Wix…) misturado: todos já estão separados.</p>
+        )}
         {faltaAtualizar ? (
           <>
             <p className="pt-2 text-sm text-suave">
