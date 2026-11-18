@@ -9,6 +9,8 @@ import { OutrosDominios } from "./outros-dominios";
 import { ContaGoogleAds } from "@/components/conta-google-ads";
 import { OptinWhatsApp } from "@/components/optin-whatsapp";
 import { AnaliseAnuncio } from "@/components/analise-anuncio";
+import { MensagemPronta } from "@/components/mensagem-pronta";
+import { abordagemParaCliente } from "@/lib/mensagem";
 import { analisarAnuncio, resumoOrganico, rotuloForca } from "@/lib/analise";
 import { organicoDaLinha, type LinhaRodada } from "@/lib/combinar";
 
@@ -88,6 +90,16 @@ export default async function Lead({ params }: { params: Promise<{ id: string }>
             <OptinWhatsApp leadId={id} autorizado={!!waContato.data?.optin_em} saiu={!!waContato.data?.optout_em} />
           )}
           <div className="pt-1">{!perfil && <ConsultaCnpj advertiserId={adv.id} inicial={cnpj.data ?? null} />}</div>
+        </section>
+        <section className="cartao space-y-2 p-4 text-sm">
+          <h2 className="font-semibold">Mensagem pronta</h2>
+          <p className="text-xs text-suave">Monta a abordagem com a análise deste lead e abre o seu WhatsApp já com o texto escrito.</p>
+          <MensagemPronta telefone={lead.telefone_principal ?? null} dados={{
+            empresa: adv.nome ?? adv.dominio, dominio: perfil ? null : adv.dominio,
+            siteFora: !!s && ["fora_do_ar", "suspenso", "dns"].includes(s.situacao),
+            semTag: !!s && s.situacao === "ok" && s.tag_google === "nao",
+            abordagem: abordagemParaCliente(analise?.abordagem, analise?.amostraPequena ?? true),
+          }} />
         </section>
       </div>
 
