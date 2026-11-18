@@ -3,12 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { linkWhatsComTexto, montarMensagem, type DadosMensagem } from "@/lib/mensagem";
 
-const CHAVE_NOME = "mensagem-remetente";
+const CHAVE_NOME = "mensagem-remetente-v2";   // v2: padrão passou a ser Bruno
 
 /** Botão "Mensagem pronta": monta o texto com a análise do lead, deixa editar e abre o WhatsApp já escrito. */
 export function MensagemPronta({ telefone, dados }: { telefone: string | null; dados: Omit<DadosMensagem, "remetente"> }) {
   const [aberto, setAberto] = useState(false);
-  const [remetente, setRemetente] = useState("Gabriel");
+  const [remetente, setRemetente] = useState("Bruno");
   const [texto, setTexto] = useState("");
   const [copiado, setCopiado] = useState(false);
 

@@ -1,25 +1,18 @@
 // "Mensagem pronta": texto para WhatsApp a partir da análise do lead. Pura (sem banco), para testar fácil.
 
 export type DadosMensagem = {
-  empresa: string;            // nome da empresa (ou domínio)
+  empresa: string;            // nome da empresa (ou domínio); hoje não entra no texto, que começa igual para todos
   dominio: string | null;     // null = anúncio leva para perfil do Google
-  remetente: string;          // quem assina (ex.: Gabriel)
+  remetente: string;          // quem assina (padrão: Bruno)
   siteFora: boolean;          // site fora do ar / suspenso / sem DNS
   semTag: boolean;            // site sem nenhuma tag do Google (não mede conversões)
   abordagem: string | null;   // "O que falar" da análise (null = não usar: amostra pequena ou presença forte)
 };
 
-/** Primeira letra maiúscula só se o nome vier todo minúsculo (ex.: domínio). */
-function nomeBonito(n: string) {
-  const s = n.replace(/^www\./, "").trim();
-  return s === s.toLowerCase() ? s.charAt(0).toUpperCase() + s.slice(1) : s;
-}
-
 export function montarMensagem(d: DadosMensagem): string {
   const partes: string[] = [];
-  // sem nome de verdade (só domínio, ex.: "hydromax.com.br"): saudação sem nome
-  const ehDominio = /\.[a-z]{2,}/i.test(d.empresa) || d.empresa.startsWith("perfil-google:");
-  partes.push(`${ehDominio ? "Olá" : `Olá, pessoal da ${nomeBonito(d.empresa)}`}! Tudo bem? Aqui é o ${d.remetente.trim() || "Gabriel"}, da Connect Digital. ` +
+  // início padronizado (igual para todo lead)
+  partes.push(`Oi! Tudo bem? Aqui é o ${d.remetente.trim() || "Bruno"}, da Connect Digital. ` +
     "Trabalhamos com Google Ads para empresas de serviço e analisamos o anúncio de vocês no Google.");
 
   const pontos: string[] = [];
