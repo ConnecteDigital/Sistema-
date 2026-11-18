@@ -99,8 +99,10 @@ export default async function Leads({ searchParams }: { searchParams: Promise<SP
         <FiltroMulti nome="regiao" rotulo="Regiões" todos="Todas as regiões" opcoes={regioes.map((r) => ({ valor: r, texto: r }))} marcados={regioesSel} />
         <button className="botao-sec">Filtrar</button>
         <span className="self-center text-sm text-suave">{lista.length} leads</span>
+        <button form="form-contatos" className="botao-sec" title="Marque os leads na primeira coluna da tabela">📇 Baixar contatos marcados (.vcf)</button>
       </form>
 
+      <form id="form-contatos" action="/api/leads/contatos" method="get" target="_blank" />
       {lista.length === 0 ? (
         <p className="cartao p-4 text-sm text-suave">
           Nenhum lead ainda. Os leads aparecem quando uma rodada termina de verificar os sites.
@@ -110,6 +112,7 @@ export default async function Leads({ searchParams }: { searchParams: Promise<SP
           <table className="w-full min-w-[1100px] text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase text-suave">
               <tr>
+                <th className="px-2 py-2" title="Marque para baixar os contatos">📇</th>
                 <th className="px-3 py-2">Prioridade</th><th className="px-3 py-2">Anunciante</th>
                 <th className="px-3 py-2">Telefone</th><th className="px-3 py-2">Força</th>
                 <th className="px-3 py-2">Observações</th>
@@ -120,6 +123,9 @@ export default async function Leads({ searchParams }: { searchParams: Promise<SP
             <tbody>
               {lista.map((l) => (
                 <tr key={l.id} className="border-t border-borda align-top">
+                  <td className="px-2 py-2">
+                    {l.telefone_principal && <input type="checkbox" name="id" value={l.id} form="form-contatos" aria-label="Marcar para baixar o contato" />}
+                  </td>
                   <td className="px-3 py-2">
                     {l.prioridade && <span className={`selo ${COR_PRIORIDADE[l.prioridade] ?? ""}`}>{l.prioridade}</span>}
                   </td>
