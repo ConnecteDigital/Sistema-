@@ -3,12 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { linkWhatsComTexto, montarMensagem, type DadosMensagem } from "@/lib/mensagem";
 
-const CHAVE_NOME = "mensagem-remetente-v2";   // v2: padrão passou a ser Bruno
+const CHAVE_NOME = "mensagem-remetente-v3";   // v3: padrão "Bruno (Prospecção)"
 
 /** Botão "Mensagem pronta": monta o texto com a análise do lead, deixa editar e abre o WhatsApp já escrito. */
 export function MensagemPronta({ telefone, dados }: { telefone: string | null; dados: Omit<DadosMensagem, "remetente"> }) {
   const [aberto, setAberto] = useState(false);
-  const [remetente, setRemetente] = useState("Bruno");
+  const [remetente, setRemetente] = useState("Bruno (Prospecção)");
   const [texto, setTexto] = useState("");
   const [copiado, setCopiado] = useState(false);
 
@@ -30,7 +30,7 @@ export function MensagemPronta({ telefone, dados }: { telefone: string | null; d
           <input value={remetente} onChange={(e) => {
             setRemetente(e.target.value);
             try { localStorage.setItem(CHAVE_NOME, e.target.value); } catch { /* ignora */ }
-          }} className="campo w-32 py-1" />
+          }} className="campo w-44 py-1" />
         </label>
         <button type="button" onClick={() => setTexto(montarMensagem({ ...dados, remetente }))} className="text-marca hover:underline">
           refazer o texto

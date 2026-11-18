@@ -3,7 +3,7 @@
 export type DadosMensagem = {
   empresa: string;            // nome da empresa (ou domínio); hoje não entra no texto, que começa igual para todos
   dominio: string | null;     // null = anúncio leva para perfil do Google
-  remetente: string;          // quem assina (padrão: Bruno)
+  remetente: string;          // quem assina (padrão: "Bruno (Prospecção)"; o texto usa só o nome)
   siteFora: boolean;          // site fora do ar / suspenso / sem DNS
   semTag: boolean;            // site sem nenhuma tag do Google (não mede conversões)
   abordagem: string | null;   // "O que falar" da análise (null = não usar: amostra pequena ou presença forte)
@@ -12,7 +12,9 @@ export type DadosMensagem = {
 export function montarMensagem(d: DadosMensagem): string {
   const partes: string[] = [];
   // início padronizado (igual para todo lead)
-  partes.push(`Oi! Tudo bem? Aqui é o ${d.remetente.trim() || "Bruno"}, da Connect Digital. ` +
+  // "Bruno (Prospecção)" → no texto vai só "Bruno" (o que está entre parênteses é a função, não o nome)
+  const nome = d.remetente.replace(/\s*\(.*?\)\s*/g, " ").trim() || "Bruno";
+  partes.push(`Oi! Tudo bem? Aqui é o ${nome}, da Connect Digital. ` +
     "Trabalhamos com Google Ads para empresas de serviço e analisamos o anúncio de vocês no Google.");
 
   const pontos: string[] = [];
