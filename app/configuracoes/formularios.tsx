@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import { adicionarChave, atualizarRodadasAntigasAcao, corrigirPlataformasAcao, validarLocais, type Resultado } from "./actions";
+import { adicionarChave, atualizarRodadasAntigasAcao, reverificarForaDoArAcao, corrigirPlataformasAcao, validarLocais, type Resultado } from "./actions";
 
 function Enviar({ children, sec }: { children: React.ReactNode; sec?: boolean }) {
   const { pending } = useFormStatus();
@@ -65,6 +65,16 @@ export function BotaoAtualizarRodadas() {
   return (
     <form action={acao} className="space-y-2">
       <Enviar sec>Atualizar análises das rodadas antigas</Enviar>
+      <Mensagem r={r} />
+    </form>
+  );
+}
+
+export function BotaoReverificarForaDoAr() {
+  const [r, acao] = useActionState(reverificarForaDoArAcao, null);
+  return (
+    <form action={acao} className="space-y-2">
+      <Enviar sec>Reverificar sites marcados como fora do ar</Enviar>
       <Mensagem r={r} />
     </form>
   );

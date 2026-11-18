@@ -66,6 +66,12 @@ export function avaliarLead(e: EntradaLead, ctx: Contexto): SaidaLead {
     obs.push(`SITE FORA DO AR e o anúncio continua rodando: está pagando clique para uma página de erro (${s.motivo ?? s.situacao}).`);
   }
   if (s?.situacao === "bloqueado") obs.push("O site bloqueia robôs: conferir abrindo no celular.");
+  if (s?.situacao === "ok" && s.motivo?.startsWith("Página do anúncio")) {
+    obs.push(`${s.motivo}. Confira clicando no anúncio no celular antes de citar.`);
+  }
+  if (s?.situacao === "ok" && s.motivo?.startsWith("Certificado")) {
+    obs.push(`${s.motivo.replace(/ \([^)]*\)$/, "")}. Confira abrindo no celular antes de citar.`);
+  }
   if (perfil) obs.push("O anúncio leva para o perfil do Google, não para um site.");
 
   // Rede: mesmo número em 3+ domínios

@@ -194,3 +194,17 @@ export async function atualizarRodadasAntigasAcao(_: Resultado): Promise<Resulta
     return { ok: false, msg: e instanceof Error ? e.message : String(e) };
   }
 }
+
+export async function reverificarForaDoArAcao(_: Resultado): Promise<Resultado> {
+  const { reverificarFalsosForaDoAr } = await import("@/lib/manutencao");
+  try {
+    const r = await reverificarFalsosForaDoAr();
+    if (!r.verificados) return { ok: true, msg: "Nada para reverificar." };
+    revalidatePath("/leads"); revalidatePath("/rodadas"); revalidatePath("/relatorios");
+    return { ok: true, msg: `Reverificados ${r.verificados} sites: ${r.abriram.length} abrem normalmente` +
+      (r.abriram.length ? ` (${r.abriram.slice(0, 6).join(", ")}${r.abriram.length > 6 ? "…" : ""})` : "") + "." +
+      (r.faltam ? ` Faltam ${r.faltam}: clique de novo.` : " Pronto, todos reverificados.") };
+  } catch (e) {
+    return { ok: false, msg: e instanceof Error ? e.message : String(e) };
+  }
+}

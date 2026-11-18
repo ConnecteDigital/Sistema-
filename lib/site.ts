@@ -1,4 +1,5 @@
 import "server-only";
+import { request as httpsRequest } from "node:https";
 import { normalizarTelefone, type Telefone } from "./telefone";
 import { extrairCnpjs } from "./cnpj";
 import { normalizar } from "./palavra";
@@ -11,7 +12,47 @@ const MAX_HTML = 2_000_000;
 export type Pagina = {
   ok: boolean; status: number | null; urlFinal: string | null; html: string; tempoMs: number;
   erroRede: "dns" | "timeout" | "conexao" | null; erroMsg: string | null;
+  avisoCertificado?: string | null;   // abriu, mas o certificado (cadeado) tem defeito (código do erro)
 };
+
+/** Erros de certificado: o site responde, só o "cadeado" tem defeito (o navegador costuma abrir mesmo assim). */
+const ERRO_CERT = /CERT|SELF_SIGNED|UNABLE_TO_GET_ISSUER|UNABLE_TO_VERIFY|ERR_TLS|DEPTH_ZERO/i;
+
+/** Segunda tentativa sem validar o certificado: só para saber se o site abre (não confia no conteúdo para mais nada). */
+function baixarIgnorandoCertificado(u: URL, timeoutMs: number, saltos = 5): Promise<{ status: number; html: string; urlFinal: string } | null> {
+  return new Promise((resolve) => {
+    if (u.protocol !== "https:") return resolve(null);
+    const req = httpsRequest(u, {
+      rejectUnauthorized: false, timeout: timeoutMs,
+      headers: { "user-agent": UA, accept: "text/html,application/xhtml+xml,*/*;q=0.8", "accept-language": "pt-BR,pt;q=0.9" },
+    }, (res) => {
+      const st = res.statusCode ?? 0;
+      if (st >= 300 && st < 400 && res.headers.location && saltos > 0) {
+        res.resume();
+        let prox: URL;
+        try { prox = new URL(res.headers.location, u); } catch { return resolve(null); }
+        if (!urlPermitida(prox)) return resolve(null);
+        if (prox.protocol === "http:") {   // redirecionou para http: usa o fetch normal
+          fetch(prox, { redirect: "follow", signal: AbortSignal.timeout(timeoutMs), headers: { "user-agent": UA } })
+            .then(async (r) => resolve({ status: r.status, html: (await r.text()).slice(0, MAX_HTML), urlFinal: r.url }))
+            .catch(() => resolve(null));
+          return;
+        }
+        baixarIgnorandoCertificado(prox, timeoutMs, saltos - 1).then(resolve);
+        return;
+      }
+      let html = "";
+      res.setEncoding("utf8");
+      res.on("data", (c: string) => { html += c; if (html.length >= MAX_HTML) res.destroy(); });
+      res.on("end", () => resolve({ status: st, html, urlFinal: u.toString() }));
+      res.on("close", () => resolve({ status: st, html, urlFinal: u.toString() }));
+      res.on("error", () => resolve(null));
+    });
+    req.on("timeout", () => { req.destroy(); resolve(null); });
+    req.on("error", () => resolve(null));
+    req.end();
+  });
+}
 
 function urlPermitida(u: URL) {
   if (!/^https?:$/.test(u.protocol)) return false;
@@ -47,6 +88,12 @@ export async function baixarPagina(url: string, timeoutMs = 15_000): Promise<Pag
     const causa = (e as { cause?: { code?: string } })?.cause?.code ?? "";
     const msg = e instanceof Error ? e.message : String(e);
     const erroRede = /ENOTFOUND|EAI_AGAIN/.test(causa) ? "dns" : /timeout|aborted/i.test(msg + causa) ? "timeout" : "conexao";
+    // certificado com defeito: o navegador normalmente abre. Tenta de novo sem validar para ver se o site responde.
+    if (ERRO_CERT.test(causa + " " + msg)) {
+      const r = await baixarIgnorandoCertificado(u, timeoutMs);
+      if (r) return { ok: r.status >= 200 && r.status < 300, status: r.status, urlFinal: r.urlFinal, html: r.html,
+        tempoMs: Date.now() - inicio, erroRede: null, erroMsg: null, avisoCertificado: causa || msg };
+    }
     return { ok: false, status: null, urlFinal: null, html: "", tempoMs: Date.now() - inicio, erroRede, erroMsg: causa || msg };
   }
 }
@@ -93,6 +140,11 @@ export function analisarPagina(p: Pagina): Analise {
   else if (st >= 500) { situacao = "fora_do_ar"; motivo = `Erro no servidor do site (HTTP ${st})`; }
   else if (st === 404 || st === 410) { situacao = "fora_do_ar"; motivo = `Página do anúncio não existe (HTTP ${st})`; }
   else if (!p.ok) { situacao = "nao_verificado"; motivo = `HTTP ${st}`; }
+  if (situacao === "ok" && p.avisoCertificado) {
+    motivo = /SELF_SIGNED|EXPIRED|ALTNAME|DEPTH_ZERO/i.test(p.avisoCertificado)
+      ? `Certificado de segurança inválido: o site abre, mas o navegador pode mostrar "site não seguro" (${p.avisoCertificado})`
+      : `Certificado de segurança incompleto: o site abre, mas alguns celulares podem mostrar aviso (${p.avisoCertificado})`;
+  }
 
   // Telefones
   const tel = [...html.matchAll(/href=["']tel:([^"']+)["']/gi)].map((m) => normalizarTelefone(decodeURIComponent(m[1])));
@@ -135,4 +187,21 @@ export function analisarPagina(p: Pagina): Analise {
       ...[...html.matchAll(/href=["'](?:https?:\/\/[^/"']+)?\/([^"'#?]{2,200})/gi)].map((m) => m[1].replace(/[/_.-]+/g, " ")),
     ].join(" ")).slice(0, 50_000),
   };
+}
+
+/**
+ * Baixa e analisa a página do anúncio. Se ela der 404/410 mas o site existir, confere a página inicial
+ * antes de dizer "fora do ar" (o anúncio pode apontar para uma página que foi apagada).
+ */
+export async function verificarUrl(url: string): Promise<{ pagina: Pagina; a: Analise }> {
+  const pagina = await baixarPagina(url);
+  const a = analisarPagina(pagina);
+  if (a.situacao !== "fora_do_ar" || (pagina.status !== 404 && pagina.status !== 410)) return { pagina, a };
+  let inicial: string | null = null;
+  try { const u = new URL(url); inicial = u.pathname !== "/" || u.search ? `${u.protocol}//${u.host}/` : null; } catch { /* url ruim */ }
+  if (!inicial) return { pagina, a };
+  const p2 = await baixarPagina(inicial);
+  const a2 = analisarPagina(p2);
+  if (a2.situacao !== "ok") return { pagina, a };
+  return { pagina: p2, a: { ...a2, motivo: `Página do anúncio dá erro ${pagina.status} (não existe), mas a página inicial do site abre` } };
 }

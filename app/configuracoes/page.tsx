@@ -2,7 +2,7 @@ import { db } from "@/lib/supabase";
 import { variaveisFaltando } from "@/lib/env";
 import { formatarData } from "@/lib/utils";
 import { AvisoConfiguracao } from "@/components/aviso-configuracao";
-import { BotaoAtualizarRodadas, BotaoCorrigirPlataformas, BotaoEnviar, BotaoValidarLocais, FormNovaChave } from "./formularios";
+import { BotaoAtualizarRodadas, BotaoCorrigirPlataformas, BotaoReverificarForaDoAr, BotaoEnviar, BotaoValidarLocais, FormNovaChave } from "./formularios";
 import {
   adicionarNicho, adicionarPessoa, adicionarVariacao, alternarChave, removerVariacao, atualizarTodosCreditos, excluirChave, removerPessoa, salvarLimiteTroca,
 } from "./actions";
@@ -28,6 +28,8 @@ export default async function Configuracoes() {
   const { PLATAFORMAS } = await import("@/lib/dominio");
   const misturados = await db().from("advertisers").select("id", { count: "exact", head: true }).in("dominio", PLATAFORMAS);
   const faltaSeparar = !!misturados.error || (misturados.count ?? 0) > 0;
+  const { contarFalsosForaDoAr } = await import("@/lib/manutencao");
+  const falsosForaDoAr = await contarFalsosForaDoAr();
   const [chaves, equipe, regioes, locais, nichos] = await Promise.all([
     db().from("serp_keys").select("*").order("id"),
     db().from("equipe").select("id, nome").eq("ativo", true).order("nome"),
@@ -241,6 +243,15 @@ export default async function Configuracoes() {
           </>
         ) : (
           <p className="pt-2 text-sm text-green-700">✓ Todas as rodadas já têm a presença por cidade e a nova leitura do site.</p>
+        )}
+        {falsosForaDoAr > 0 && (
+          <>
+            <p className="pt-2 text-sm text-suave">
+              {falsosForaDoAr} site(s) marcados como fora do ar podem abrir normalmente: o cadeado (certificado) tem defeito ou só a página
+              do anúncio dá erro 404. Este botão confere de novo com a regra nova e corrige a prioridade e as observações. Não mexe no status dos leads.
+            </p>
+            <BotaoReverificarForaDoAr />
+          </>
         )}
       </section>
     </main>

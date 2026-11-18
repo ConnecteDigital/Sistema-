@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "./supabase";
 import { PLATAFORMAS, identificarAnunciante } from "./dominio";
-import { atualizarAnaliseDaRodada, reagregar } from "./motor";
+import { atualizarAnaliseDaRodada, gerarLeads, reagregar, verificarSite } from "./motor";
 
 /**
  * Corrige anunciantes que foram agrupados pelo domínio da plataforma (ex.: todos os sites "*.lovable.app"
@@ -60,4 +60,42 @@ export async function atualizarRodadasAntigas(porVez = 4): Promise<{ feitas: num
     feitas.push(runId);
   }
   return { feitas, faltam: Math.max(0, pendentes.length - feitas.length) };
+}
+
+// Verificações feitas antes desta correção (certificado com defeito e 404 só na página do anúncio)
+const CORRECAO_FORA_DO_AR = "2026-11-18T14:30:00Z";
+const FILTRO_FALSO_FORA = "motivo.ilike.%CERT%,motivo.ilike.%SELF_SIGNED%,motivo.ilike.%UNABLE_TO%,motivo.ilike.%TLS%,motivo.ilike.%HTTP 404%,motivo.ilike.%HTTP 410%";
+
+/** Quantos sites podem ter sido marcados "fora do ar" por engano (certificado ou 404 da página do anúncio). */
+export async function contarFalsosForaDoAr(): Promise<number> {
+  const { count, error } = await db().from("site_checks_recentes").select("advertiser_id", { count: "exact", head: true })
+    .eq("situacao", "fora_do_ar").lt("verificado_em", CORRECAO_FORA_DO_AR).or(FILTRO_FALSO_FORA);
+  return error ? 0 : (count ?? 0);
+}
+
+/**
+ * Reverifica esses sites com a regra nova e refaz os leads das rodadas deles (prioridade e observações).
+ * Status, responsável e notas dos leads não mudam. Faz `porVez` sites por clique.
+ */
+export async function reverificarFalsosForaDoAr(porVez = 24): Promise<{ verificados: number; abriram: string[]; faltam: number }> {
+  type C = { advertiser_id: number; url: string; advertisers: { dominio: string } };
+  const { data, error } = await db().from("site_checks_recentes").select("advertiser_id, url, advertisers(dominio)")
+    .eq("situacao", "fora_do_ar").lt("verificado_em", CORRECAO_FORA_DO_AR).or(FILTRO_FALSO_FORA).limit(1000);
+  if (error) throw new Error(error.message);
+  const lista = (data ?? []) as unknown as C[];
+  const agora = lista.slice(0, porVez);
+  for (let i = 0; i < agora.length; i += 8) {
+    await Promise.all(agora.slice(i, i + 8).map((c) => verificarSite(c.advertiser_id, c.advertisers.dominio, c.url).catch(() => {})));
+  }
+  const ids = agora.map((c) => c.advertiser_id);
+  const { data: novos } = ids.length
+    ? await db().from("site_checks_recentes").select("advertiser_id, situacao, advertisers(dominio)").in("advertiser_id", ids)
+    : { data: [] };
+  const abriram = ((novos ?? []) as unknown as { situacao: string; advertisers: { dominio: string } }[])
+    .filter((n) => n.situacao === "ok").map((n) => n.advertisers.dominio);
+  // refaz prioridade/observações nas rodadas desses anunciantes
+  const { data: ls } = ids.length ? await db().from("leads").select("ultima_rodada").in("advertiser_id", ids) : { data: [] };
+  const rodadas = [...new Set((ls ?? []).map((l) => l.ultima_rodada as number | null).filter((x): x is number => !!x))];
+  for (const r of rodadas) await gerarLeads(r);
+  return { verificados: agora.length, abriram, faltam: Math.max(0, lista.length - agora.length) };
 }

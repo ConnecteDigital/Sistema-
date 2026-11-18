@@ -4,7 +4,7 @@ import { descriptografar } from "./crypto";
 import { buscarAnuncios, consultarConta, type OrganicoSerpApi } from "./serpapi";
 import { identificarAnunciante } from "./dominio";
 import { agregar, agregarOrganico, organicoDe, type AdBruto, type BuscaOk, type Limites, type OrgBruto } from "./agregacao";
-import { analisarPagina, baixarPagina } from "./site";
+import { verificarUrl } from "./site";
 import { dominioRaiz, hostDe } from "./dominio";
 import { avaliarLead, montarContexto, type PresencaRegiao, type SiteResumo } from "./regras";
 import { consultarCnpjDoSite, type ResultadoCnpj } from "./consulta-cnpj";
@@ -393,8 +393,7 @@ function urlParaVerificar(dominio: string, link: string | null) {
 }
 
 export async function verificarSite(advertiserId: number, dominio: string, url: string) {
-  const pagina = await baixarPagina(url);
-  const a = analisarPagina(pagina);
+  const { pagina, a } = await verificarUrl(url);
   await db().from("site_checks").insert({
     advertiser_id: advertiserId, url, http_status: pagina.status, url_final: pagina.urlFinal,
     situacao: a.situacao, motivo: a.motivo, telefones: a.telefones.map((t) => t.formatado),
