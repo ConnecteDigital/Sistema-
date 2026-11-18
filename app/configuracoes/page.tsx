@@ -21,6 +21,9 @@ export default async function Configuracoes() {
   if (variaveisFaltando().length) {
     return <main className="mx-auto max-w-4xl p-4"><AvisoConfiguracao /></main>;
   }
+  // Rodadas antigas ainda sem a presença por cidade? (erro = banco sem o 0014: mostra o botão mesmo assim)
+  const pendentesCidade = await db().from("run_advertisers").select("id", { count: "exact", head: true }).is("por_ponto", null);
+  const faltaAtualizar = !!pendentesCidade.error || (pendentesCidade.count ?? 0) > 0;
   const [chaves, equipe, regioes, locais, nichos] = await Promise.all([
     db().from("serp_keys").select("*").order("id"),
     db().from("equipe").select("id, nome").eq("ativo", true).order("nome"),
@@ -218,11 +221,17 @@ export default async function Configuracoes() {
           diferentes. Este botão separa cada site, refaz as rodadas afetadas e apaga o anunciante misturado. Não gasta crédito da SerpApi.
         </p>
         <BotaoCorrigirPlataformas />
-        <p className="pt-2 text-sm text-suave">
-          Rodadas feitas antes da presença por cidade: calcula a força só nas cidades onde cada anunciante anuncia e refaz a leitura
-          do site com serviços do mesmo ramo (caça vazamento e hidráulica contam como encanador). Não gasta crédito e não mexe nos leads.
-        </p>
-        <BotaoAtualizarRodadas />
+        {faltaAtualizar ? (
+          <>
+            <p className="pt-2 text-sm text-suave">
+              Rodadas feitas antes da presença por cidade: calcula a força só nas cidades onde cada anunciante anuncia e refaz a leitura
+              do site com serviços do mesmo ramo (caça vazamento e hidráulica contam como encanador). Não gasta crédito e não mexe nos leads.
+            </p>
+            <BotaoAtualizarRodadas />
+          </>
+        ) : (
+          <p className="pt-2 text-sm text-green-700">✓ Todas as rodadas já têm a presença por cidade e a nova leitura do site.</p>
+        )}
       </section>
     </main>
   );
