@@ -201,7 +201,7 @@ export async function reverificarForaDoArAcao(_: Resultado): Promise<Resultado> 
     const r = await reverificarFalsosForaDoAr();
     if (!r.verificados) return { ok: true, msg: "Nada para reverificar." };
     revalidatePath("/leads"); revalidatePath("/rodadas"); revalidatePath("/relatorios");
-    return { ok: true, msg: `Reverificados ${r.verificados} sites: ${r.abriram.length} abrem normalmente` +
+    return { ok: true, msg: `Reverificados ${r.verificados} sites: ${r.abriram.length} abrem normalmente; os outros ficaram como "conferir no celular" ou fora do ar comprovado` +
       (r.abriram.length ? ` (${r.abriram.slice(0, 6).join(", ")}${r.abriram.length > 6 ? "…" : ""})` : "") + "." +
       (r.faltam ? ` Faltam ${r.faltam}: clique de novo.` : " Pronto, todos reverificados.") };
   } catch (e) {

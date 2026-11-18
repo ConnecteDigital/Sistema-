@@ -62,14 +62,15 @@ export async function atualizarRodadasAntigas(porVez = 4): Promise<{ feitas: num
   return { feitas, faltam: Math.max(0, pendentes.length - feitas.length) };
 }
 
-// Verificações feitas antes desta correção (certificado com defeito e 404 só na página do anúncio)
-const CORRECAO_FORA_DO_AR = "2026-11-18T14:30:00Z";
-const FILTRO_FALSO_FORA = "motivo.ilike.%CERT%,motivo.ilike.%SELF_SIGNED%,motivo.ilike.%UNABLE_TO%,motivo.ilike.%TLS%,motivo.ilike.%HTTP 404%,motivo.ilike.%HTTP 410%";
+// Verificações feitas antes da regra nova de "fora do ar" (só com prova firme)
+const CORRECAO_FORA_DO_AR = "2026-11-18T14:40:00Z";
+// todos os "fora do ar" / "domínio não existe" da regra antiga (a nova só marca assim com prova firme)
+const SITUACOES_A_REVER = ["fora_do_ar", "dns"];
 
-/** Quantos sites podem ter sido marcados "fora do ar" por engano (certificado ou 404 da página do anúncio). */
+/** Quantos sites foram marcados "fora do ar" pela regra antiga e precisam ser conferidos de novo. */
 export async function contarFalsosForaDoAr(): Promise<number> {
   const { count, error } = await db().from("site_checks_recentes").select("advertiser_id", { count: "exact", head: true })
-    .eq("situacao", "fora_do_ar").lt("verificado_em", CORRECAO_FORA_DO_AR).or(FILTRO_FALSO_FORA);
+    .in("situacao", SITUACOES_A_REVER).lt("verificado_em", CORRECAO_FORA_DO_AR);
   return error ? 0 : (count ?? 0);
 }
 
@@ -77,10 +78,10 @@ export async function contarFalsosForaDoAr(): Promise<number> {
  * Reverifica esses sites com a regra nova e refaz os leads das rodadas deles (prioridade e observações).
  * Status, responsável e notas dos leads não mudam. Faz `porVez` sites por clique.
  */
-export async function reverificarFalsosForaDoAr(porVez = 24): Promise<{ verificados: number; abriram: string[]; faltam: number }> {
+export async function reverificarFalsosForaDoAr(porVez = 16): Promise<{ verificados: number; abriram: string[]; faltam: number }> {
   type C = { advertiser_id: number; url: string; advertisers: { dominio: string } };
   const { data, error } = await db().from("site_checks_recentes").select("advertiser_id, url, advertisers(dominio)")
-    .eq("situacao", "fora_do_ar").lt("verificado_em", CORRECAO_FORA_DO_AR).or(FILTRO_FALSO_FORA).limit(1000);
+    .in("situacao", SITUACOES_A_REVER).lt("verificado_em", CORRECAO_FORA_DO_AR).limit(1000);
   if (error) throw new Error(error.message);
   const lista = (data ?? []) as unknown as C[];
   const agora = lista.slice(0, porVez);

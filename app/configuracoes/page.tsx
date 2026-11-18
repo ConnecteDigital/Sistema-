@@ -247,8 +247,9 @@ export default async function Configuracoes() {
         {falsosForaDoAr > 0 && (
           <>
             <p className="pt-2 text-sm text-suave">
-              {falsosForaDoAr} site(s) marcados como fora do ar podem abrir normalmente: o cadeado (certificado) tem defeito ou só a página
-              do anúncio dá erro 404. Este botão confere de novo com a regra nova e corrige a prioridade e as observações. Não mexe no status dos leads.
+              {falsosForaDoAr} site(s) foram marcados como fora do ar pela regra antiga e muitos abrem normalmente (a hospedagem barra o robô,
+              o cadeado tem defeito ou só a página do anúncio dá 404). Este botão confere de novo com a regra nova, que só diz "fora do ar"
+              com prova firme, e corrige a prioridade e as observações. Não mexe no status dos leads.
             </p>
             <BotaoReverificarForaDoAr />
           </>

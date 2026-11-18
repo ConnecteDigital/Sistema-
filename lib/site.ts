@@ -7,6 +7,7 @@ import { normalizar } from "./palavra";
 // Verificação de site pelo nosso servidor (seção 9). Grátis.
 
 const UA = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Mobile Safari/537.36";
+const UA_PC = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
 const MAX_HTML = 2_000_000;
 
 export type Pagina = {
@@ -19,12 +20,12 @@ export type Pagina = {
 const ERRO_CERT = /CERT|SELF_SIGNED|UNABLE_TO_GET_ISSUER|UNABLE_TO_VERIFY|ERR_TLS|DEPTH_ZERO/i;
 
 /** Segunda tentativa sem validar o certificado: só para saber se o site abre (não confia no conteúdo para mais nada). */
-function baixarIgnorandoCertificado(u: URL, timeoutMs: number, saltos = 5): Promise<{ status: number; html: string; urlFinal: string } | null> {
+function baixarIgnorandoCertificado(u: URL, timeoutMs: number, ua = UA, saltos = 5): Promise<{ status: number; html: string; urlFinal: string } | null> {
   return new Promise((resolve) => {
     if (u.protocol !== "https:") return resolve(null);
     const req = httpsRequest(u, {
       rejectUnauthorized: false, timeout: timeoutMs,
-      headers: { "user-agent": UA, accept: "text/html,application/xhtml+xml,*/*;q=0.8", "accept-language": "pt-BR,pt;q=0.9" },
+      headers: { "user-agent": ua, accept: "text/html,application/xhtml+xml,*/*;q=0.8", "accept-language": "pt-BR,pt;q=0.9" },
     }, (res) => {
       const st = res.statusCode ?? 0;
       if (st >= 300 && st < 400 && res.headers.location && saltos > 0) {
@@ -33,12 +34,12 @@ function baixarIgnorandoCertificado(u: URL, timeoutMs: number, saltos = 5): Prom
         try { prox = new URL(res.headers.location, u); } catch { return resolve(null); }
         if (!urlPermitida(prox)) return resolve(null);
         if (prox.protocol === "http:") {   // redirecionou para http: usa o fetch normal
-          fetch(prox, { redirect: "follow", signal: AbortSignal.timeout(timeoutMs), headers: { "user-agent": UA } })
+          fetch(prox, { redirect: "follow", signal: AbortSignal.timeout(timeoutMs), headers: { "user-agent": ua } })
             .then(async (r) => resolve({ status: r.status, html: (await r.text()).slice(0, MAX_HTML), urlFinal: r.url }))
             .catch(() => resolve(null));
           return;
         }
-        baixarIgnorandoCertificado(prox, timeoutMs, saltos - 1).then(resolve);
+        baixarIgnorandoCertificado(prox, timeoutMs, ua, saltos - 1).then(resolve);
         return;
       }
       let html = "";
@@ -62,7 +63,7 @@ function urlPermitida(u: URL) {
   return true;
 }
 
-export async function baixarPagina(url: string, timeoutMs = 15_000): Promise<Pagina> {
+export async function baixarPagina(url: string, timeoutMs = 15_000, ua = UA): Promise<Pagina> {
   const inicio = Date.now();
   let u: URL;
   try { u = new URL(url); } catch { return { ok: false, status: null, urlFinal: null, html: "", tempoMs: 0, erroRede: "conexao", erroMsg: "URL inválida" }; }
@@ -70,7 +71,7 @@ export async function baixarPagina(url: string, timeoutMs = 15_000): Promise<Pag
   try {
     const r = await fetch(u, {
       redirect: "follow", signal: AbortSignal.timeout(timeoutMs), cache: "no-store",
-      headers: { "user-agent": UA, accept: "text/html,application/xhtml+xml,*/*;q=0.8", "accept-language": "pt-BR,pt;q=0.9" },
+      headers: { "user-agent": ua, accept: "text/html,application/xhtml+xml,*/*;q=0.8", "accept-language": "pt-BR,pt;q=0.9" },
     });
     let html = "";
     if (r.body) {
@@ -90,7 +91,7 @@ export async function baixarPagina(url: string, timeoutMs = 15_000): Promise<Pag
     const erroRede = /ENOTFOUND|EAI_AGAIN/.test(causa) ? "dns" : /timeout|aborted/i.test(msg + causa) ? "timeout" : "conexao";
     // certificado com defeito: o navegador normalmente abre. Tenta de novo sem validar para ver se o site responde.
     if (ERRO_CERT.test(causa + " " + msg)) {
-      const r = await baixarIgnorandoCertificado(u, timeoutMs);
+      const r = await baixarIgnorandoCertificado(u, timeoutMs, ua);
       if (r) return { ok: r.status >= 200 && r.status < 300, status: r.status, urlFinal: r.urlFinal, html: r.html,
         tempoMs: Date.now() - inicio, erroRede: null, erroMsg: null, avisoCertificado: causa || msg };
     }
@@ -128,7 +129,8 @@ function unicos(ts: (Telefone | null)[]) {
 export function analisarPagina(p: Pagina): Analise {
   const vazio = { telefones: [], whatsapps: [], tagsAw: [], tagsGtm: [], ga4: [], cnpjs: [], wordpress: false, texto: "" };
   if (p.erroRede === "dns") return { ...vazio, situacao: "dns", motivo: "Domínio não existe (falha de DNS)", tagGoogle: "nao_verificado" };
-  if (p.erroRede) return { ...vazio, situacao: "fora_do_ar", motivo: p.erroRede === "timeout" ? "Site não respondeu (tempo esgotado)" : `Site não abre (${p.erroMsg})`, tagGoogle: "nao_verificado" };
+  // Sem resposta do nosso servidor não prova que o site está fora: muitas hospedagens barram servidores de fora do Brasil.
+  if (p.erroRede) return { ...vazio, situacao: "nao_verificado", motivo: p.erroRede === "timeout" ? "O site não respondeu ao robô (tempo esgotado)" : `O site não abriu para o robô (${p.erroMsg})`, tagGoogle: "nao_verificado" };
 
   const html = p.html;
   const st = p.status ?? 0;
@@ -137,8 +139,8 @@ export function analisarPagina(p: Pagina): Analise {
   if (SUSPENSO.test(html.slice(0, 200_000))) { situacao = "suspenso"; motivo = "Hospedagem suspensa (Account Suspended)"; }
   else if (ESTACIONADO.test(html.slice(0, 200_000)) && html.length < 150_000) { situacao = "fora_do_ar"; motivo = "Domínio estacionado / à venda / expirado"; }
   else if (st === 403 || st === 429 || (st === 503 && BLOQUEIO.test(html))) { situacao = "bloqueado"; motivo = `Site bloqueia robôs (HTTP ${st})`; }
-  else if (st >= 500) { situacao = "fora_do_ar"; motivo = `Erro no servidor do site (HTTP ${st})`; }
-  else if (st === 404 || st === 410) { situacao = "fora_do_ar"; motivo = `Página do anúncio não existe (HTTP ${st})`; }
+  else if (st >= 500) { situacao = "nao_verificado"; motivo = `O site respondeu erro HTTP ${st} para o robô`; }
+  else if (st === 404 || st === 410) { situacao = "nao_verificado"; motivo = `A página do anúncio respondeu HTTP ${st} (não existe) para o robô`; }
   else if (!p.ok) { situacao = "nao_verificado"; motivo = `HTTP ${st}`; }
   if (situacao === "ok" && p.avisoCertificado) {
     motivo = /SELF_SIGNED|EXPIRED|ALTNAME|DEPTH_ZERO/i.test(p.avisoCertificado)
@@ -189,19 +191,62 @@ export function analisarPagina(p: Pagina): Analise {
   };
 }
 
+/** O domínio existe? Pergunta a um DNS público (Google). true = existe, false = não existe (NXDOMAIN), null = não deu para saber. */
+async function dominioExiste(host: string): Promise<boolean | null> {
+  try {
+    const r = await fetch(`https://dns.google/resolve?name=${encodeURIComponent(host)}&type=A`, { signal: AbortSignal.timeout(8_000), cache: "no-store" });
+    const j = await r.json() as { Status?: number; Answer?: unknown[] };
+    if (j.Status === 3) return false;
+    if (j.Status === 0) return true;
+    return null;
+  } catch { return null; }
+}
+
+const espera = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 /**
- * Baixa e analisa a página do anúncio. Se ela der 404/410 mas o site existir, confere a página inicial
- * antes de dizer "fora do ar" (o anúncio pode apontar para uma página que foi apagada).
+ * Baixa e analisa a página do anúncio, com cuidado para não dizer "fora do ar" à toa:
+ * - erro de servidor, sem resposta ou 404: tenta de novo (como computador) e confere a página inicial;
+ * - falha de DNS: confirma num DNS público se o domínio existe mesmo.
+ * Só fica "fora do ar"/"dns"/"suspenso" com prova firme; o resto vira "não verificado" (conferir no celular).
  */
 export async function verificarUrl(url: string): Promise<{ pagina: Pagina; a: Analise }> {
-  const pagina = await baixarPagina(url);
-  const a = analisarPagina(pagina);
-  if (a.situacao !== "fora_do_ar" || (pagina.status !== 404 && pagina.status !== 410)) return { pagina, a };
-  let inicial: string | null = null;
-  try { const u = new URL(url); inicial = u.pathname !== "/" || u.search ? `${u.protocol}//${u.host}/` : null; } catch { /* url ruim */ }
-  if (!inicial) return { pagina, a };
-  const p2 = await baixarPagina(inicial);
-  const a2 = analisarPagina(p2);
-  if (a2.situacao !== "ok") return { pagina, a };
-  return { pagina: p2, a: { ...a2, motivo: `Página do anúncio dá erro ${pagina.status} (não existe), mas a página inicial do site abre` } };
+  let pagina = await baixarPagina(url);
+  let a = analisarPagina(pagina);
+  if (a.situacao === "ok" || a.situacao === "suspenso" || a.situacao === "bloqueado" || a.situacao === "fora_do_ar") return { pagina, a };
+
+  let u: URL | null = null;
+  try { u = new URL(url); } catch { /* url ruim */ }
+  if (!u) return { pagina, a };
+
+  // Falha de DNS: o domínio existe mesmo?
+  if (a.situacao === "dns") {
+    const existe = await dominioExiste(u.hostname);
+    if (existe === false) return { pagina, a };   // confirmado: domínio não existe
+    await espera(1500);
+    const p2 = await baixarPagina(url, 15_000, UA_PC);
+    const a2 = analisarPagina(p2);
+    if (a2.situacao === "ok") return { pagina: p2, a: a2 };
+    return { pagina, a: { ...a, situacao: "nao_verificado",
+      motivo: existe ? "O endereço não abriu para o robô, mas o domínio existe" : "O endereço não abriu para o robô (DNS não confirmou)" } };
+  }
+
+  // Não verificado (erro de servidor, sem resposta, 404): tenta de novo como computador e a página inicial
+  const tentativas: string[] = [url];
+  const inicial = `${u.protocol}//${u.host}/`;
+  if (inicial !== url) tentativas.push(inicial);
+  const semWww = u.hostname.startsWith("www.") ? u.hostname.slice(4) : `www.${u.hostname}`;
+  tentativas.push(`${u.protocol}//${semWww}/`);
+  await espera(1500);
+  for (const t of tentativas) {
+    const p2 = await baixarPagina(t, 15_000, UA_PC);
+    const a2 = analisarPagina(p2);
+    if (a2.situacao === "ok") {
+      const naoExiste = pagina.status === 404 || pagina.status === 410;
+      return { pagina: p2, a: t === url ? a2 : { ...a2,
+        motivo: naoExiste ? `Página do anúncio dá erro ${pagina.status} (não existe), mas a página inicial do site abre`
+          : `A página do anúncio não abriu para o robô (${a.motivo}), mas a página inicial do site abre` } };
+    }
+  }
+  return { pagina, a };
 }
