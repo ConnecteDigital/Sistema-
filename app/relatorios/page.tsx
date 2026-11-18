@@ -7,6 +7,7 @@ import { donosParaContatos } from "@/lib/exportar";
 import { formatarData } from "@/lib/utils";
 import { RelatorioLigacao } from "../rodadas/[id]/relatorio";
 import { SeletorRodadas } from "./seletor";
+import { LembrarFiltros } from "@/components/lembrar-filtros";
 import type { Linha } from "@/lib/linha";
 
 export const dynamic = "force-dynamic";
@@ -61,8 +62,13 @@ export default async function Relatorios({ searchParams }: { searchParams: Promi
   const ids = (rodadasParam ?? "").split(",").map(Number).filter(Boolean);
   const escolhidas = ids.length ? ids : [Number(rodada) || lista[0].id];
   const dados = await carregarRodadas(escolhidas);
-  return <ConteudoRelatorio lista={lista} runs={dados?.runs ?? []} todas={dados?.linhas ?? []}
-    so={so && so in ROTULO_COMP ? (so as Comparacao) : null} />;
+  return (
+    <>
+      <LembrarFiltros chave="relatorios" />
+      <ConteudoRelatorio lista={lista} runs={dados?.runs ?? []} todas={dados?.linhas ?? []}
+        so={so && so in ROTULO_COMP ? (so as Comparacao) : null} />
+    </>
+  );
 }
 
 export function ConteudoRelatorio({ lista, runs, todas, so }: {
@@ -106,7 +112,7 @@ export function ConteudoRelatorio({ lista, runs, todas, so }: {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="space-y-1">
           <h1 className="text-xl font-semibold">Relatórios</h1>
-          <SeletorRodadas atuais={runs.map((r) => r.id)} rodadas={lista.map((r) => ({ id: r.id, rotulo: rotulo(r) }))} />
+          <SeletorRodadas key={runs.map((r) => r.id).join(",")} atuais={runs.map((r) => r.id)} rodadas={lista.map((r) => ({ id: r.id, rotulo: rotulo(r) }))} />
           <p className="text-xs text-suave">
             {[...new Set(linhas.map((l) => l.regiao))].join(", ")} · {sites.length} sites · {donos.length} donos
             {varias ? ` · ${runs.length} rodadas juntas, sem repetir anunciante` : ""}

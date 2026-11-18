@@ -5,22 +5,53 @@ import { COR_FORCA, COR_PRIORIDADE, linkWhats } from "@/components/selos";
 import { CampoData, CampoResponsavel, CampoStatus } from "./campos";
 import { STATUS_LEAD as STATUS } from "@/lib/status";
 import { OptinWhatsApp } from "@/components/optin-whatsapp";
+import { LembrarFiltros } from "@/components/lembrar-filtros";
+import { FiltroMulti } from "./filtro-multi";
+import { formatarData } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Leads" };
 
-type SP = { prioridade?: string; status?: string; q?: string; regiao?: string };
+type SP = { prioridade?: string; status?: string; q?: string; regiao?: string | string[]; rodada?: string | string[] };
+const lista_ = (v: string | string[] | undefined) => (Array.isArray(v) ? v : v ? [v] : []).filter(Boolean);
 
 export default async function Leads({ searchParams }: { searchParams: Promise<SP> }) {
   const f = await searchParams;
-  let consulta = db().from("leads")
-    .select("id, prioridade, telefone_principal, outros_telefones, observacoes, status, responsavel_id, data_contato, forca, presenca, regioes, atualizado_em, cnpj, razao_social, advertisers(dominio, nome)")
-    .limit(2000);
-  if (f.prioridade) consulta = consulta.eq("prioridade", f.prioridade);
-  if (f.status) consulta = consulta.eq("status", f.status);
-  if (f.regiao) consulta = consulta.contains("regioes", [f.regiao]);
-  const [leads, equipe] = await Promise.all([
-    consulta, db().from("equipe").select("id, nome").eq("ativo", true).order("nome"),
+  const regioesSel = lista_(f.regiao);
+  const rodadasSel = lista_(f.rodada).map(Number).filter(Boolean);
+  const CAMPOS = "id, prioridade, telefone_principal, outros_telefones, observacoes, status, responsavel_id, data_contato, forca, presenca, regioes, atualizado_em, cnpj, razao_social, advertiser_id, advertisers(dominio, nome)";
+  const filtrar = <T,>(c: T) => {
+    let x = c as unknown as ReturnType<ReturnType<typeof db>["from"]>["select"] extends (...a: never[]) => infer R ? R : never;
+    if (f.prioridade) x = x.eq("prioridade", f.prioridade);
+    if (f.status) x = x.eq("status", f.status);
+    if (regioesSel.length) x = x.overlaps("regioes", regioesSel);
+    return x;
+  };
+
+  // Leads das rodadas escolhidas: anunciantes que apareceram nelas
+  let leads: { data: unknown[] | null; error: { message: string } | null };
+  if (rodadasSel.length) {
+    const advIds = new Set<number>();
+    for (let de = 0; ; de += 1000) {
+      const { data } = await db().from("run_advertisers").select("advertiser_id").in("run_id", rodadasSel).order("id").range(de, de + 999);
+      for (const r of data ?? []) advIds.add(r.advertiser_id as number);
+      if (!data || data.length < 1000) break;
+    }
+    const ids = [...advIds], dados: unknown[] = [];
+    let erro: { message: string } | null = null;
+    for (let i = 0; i < ids.length; i += 300) {
+      const r = await filtrar(db().from("leads").select(CAMPOS)).in("advertiser_id", ids.slice(i, i + 300)).limit(2000);
+      if (r.error) erro = r.error;
+      dados.push(...(r.data ?? []));
+    }
+    leads = { data: dados, error: erro };
+  } else {
+    leads = await filtrar(db().from("leads").select(CAMPOS)).limit(2000);
+  }
+  const [equipe, rodadasDb, todasRegioes] = await Promise.all([
+    db().from("equipe").select("id, nome").eq("ativo", true).order("nome"),
+    db().from("runs").select("id, criado_em, termos, status").order("id", { ascending: false }).limit(60),
+    db().from("regions").select("nome").order("nome"),
   ]);
   type L = { id: number; prioridade: string | null; telefone_principal: string | null; outros_telefones: string[];
     observacoes: string[]; status: string; responsavel_id: number | null; data_contato: string | null; forca: string | null;
@@ -38,14 +69,23 @@ export default async function Leads({ searchParams }: { searchParams: Promise<SP
   }
   const cnpjRepetido = new Map<string, number>();
   for (const l of (leads.data ?? []) as unknown as L[]) if (l.cnpj) cnpjRepetido.set(l.cnpj, (cnpjRepetido.get(l.cnpj) ?? 0) + 1);
-  const regioes = [...new Set(((leads.data ?? []) as unknown as L[]).flatMap((l) => l.regioes))].sort();
+  const regioes = (todasRegioes.data ?? []).map((r) => r.nome as string);
+  const opRodadas = (rodadasDb.data ?? []).map((r) => ({
+    valor: String(r.id),
+    texto: `#${r.id} · ${formatarData(r.criado_em)} · ${(Array.isArray(r.termos) ? r.termos : []).slice(0, 3).join(", ")}${r.status !== "pronta" ? ` (${r.status})` : ""}`,
+  }));
 
   return (
     <main className="mx-auto max-w-7xl space-y-4 p-4">
-      <h1 className="text-xl font-semibold">Leads</h1>
+      <LembrarFiltros chave="leads" />
+      <div className="flex items-baseline justify-between gap-2">
+        <h1 className="text-xl font-semibold">Leads</h1>
+        <Link href="/leads?limpar=1" className="text-xs text-marca hover:underline">limpar filtros</Link>
+      </div>
       {leads.error && <p className="text-sm text-red-600">{leads.error.message} — rodou o 0004_sites_leads.sql?</p>}
 
-      <form className="flex flex-wrap gap-2">
+      {/* key: quando os filtros voltam do "lembrar", o formulário recomeça já com eles */}
+      <form key={JSON.stringify(f)} className="flex flex-wrap gap-2">
         <input name="q" defaultValue={f.q} placeholder="Buscar nome, site, telefone ou CNPJ" className="campo w-full sm:w-64" />
         <select name="prioridade" defaultValue={f.prioridade ?? ""} className="campo">
           <option value="">Toda prioridade</option>
@@ -55,12 +95,8 @@ export default async function Leads({ searchParams }: { searchParams: Promise<SP
           <option value="">Todo status</option>
           {STATUS.map((s) => <option key={s}>{s}</option>)}
         </select>
-        {regioes.length > 1 && (
-          <select name="regiao" defaultValue={f.regiao ?? ""} className="campo">
-            <option value="">Todas as regiões</option>
-            {regioes.map((r) => <option key={r}>{r}</option>)}
-          </select>
-        )}
+        <FiltroMulti nome="rodada" rotulo="Rodadas" todos="Todas as rodadas" opcoes={opRodadas} marcados={rodadasSel.map(String)} />
+        <FiltroMulti nome="regiao" rotulo="Regiões" todos="Todas as regiões" opcoes={regioes.map((r) => ({ valor: r, texto: r }))} marcados={regioesSel} />
         <button className="botao-sec">Filtrar</button>
         <span className="self-center text-sm text-suave">{lista.length} leads</span>
       </form>
