@@ -7,6 +7,7 @@ import { STATUS_LEAD as STATUS } from "@/lib/status";
 import { OptinWhatsApp } from "@/components/optin-whatsapp";
 import { LembrarFiltros } from "@/components/lembrar-filtros";
 import { FiltroMulti } from "./filtro-multi";
+import { BarraMarcados, MarcarLead } from "@/components/selecao-contatos";
 import { formatarData } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -99,10 +100,9 @@ export default async function Leads({ searchParams }: { searchParams: Promise<SP
         <FiltroMulti nome="regiao" rotulo="Regiões" todos="Todas as regiões" opcoes={regioes.map((r) => ({ valor: r, texto: r }))} marcados={regioesSel} />
         <button className="botao-sec">Filtrar</button>
         <span className="self-center text-sm text-suave">{lista.length} leads</span>
-        <button form="form-contatos" className="botao-sec" title="Marque os leads na primeira coluna da tabela">📇 Baixar contatos marcados (.vcf)</button>
       </form>
 
-      <form id="form-contatos" action="/api/leads/contatos" method="get" target="_blank" />
+      <BarraMarcados />
       {lista.length === 0 ? (
         <p className="cartao p-4 text-sm text-suave">
           Nenhum lead ainda. Os leads aparecem quando uma rodada termina de verificar os sites.
@@ -124,7 +124,7 @@ export default async function Leads({ searchParams }: { searchParams: Promise<SP
               {lista.map((l) => (
                 <tr key={l.id} className="border-t border-borda align-top">
                   <td className="px-2 py-2">
-                    {l.telefone_principal && <input type="checkbox" name="id" value={l.id} form="form-contatos" aria-label="Marcar para baixar o contato" />}
+                    {l.telefone_principal && <MarcarLead id={l.id} nome={l.advertisers.nome ?? l.advertisers.dominio} />}
                   </td>
                   <td className="px-3 py-2">
                     {l.prioridade && <span className={`selo ${COR_PRIORIDADE[l.prioridade] ?? ""}`}>{l.prioridade}</span>}
