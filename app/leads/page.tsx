@@ -131,7 +131,10 @@ export default async function Leads({ searchParams }: { searchParams: Promise<SP
                   </td>
                   <td className="px-3 py-2">
                     <Link href={`/leads/${l.id}`} className="font-medium hover:underline">{l.advertisers.nome ?? l.advertisers.dominio}</Link>
-                    <span className="block text-xs text-suave">{l.advertisers.dominio.replace("perfil-google:", "perfil Google: ")}</span>
+                    {l.advertisers.dominio.startsWith("perfil-google:")
+                      ? <span className="block text-xs text-suave">{l.advertisers.dominio.replace("perfil-google:", "perfil Google: ")}</span>
+                      : <a href={`https://${l.advertisers.dominio}`} target="_blank" rel="noreferrer"
+                          className="block text-xs text-marca hover:underline">{l.advertisers.dominio} ↗</a>}
                     {(l.razao_social || l.cnpj) && (
                       <span className="block text-[11px]">
                         {l.razao_social}{l.cnpj && <span className="ml-1 font-mono text-suave">{l.cnpj}</span>}
