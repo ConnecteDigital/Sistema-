@@ -100,3 +100,25 @@ export async function reverificarFalsosForaDoAr(porVez = 16): Promise<{ verifica
   for (const r of rodadas) await gerarLeads(r);
   return { verificados: agora.length, abriram, faltam: Math.max(0, lista.length - agora.length) };
 }
+
+// Prioridade v2 (força onde anuncia + só "Alta" com sinal concreto). Marca até qual rodada já foi refeita.
+const CHAVE_PRIORIDADE = "prioridade_v2_ate";
+
+export async function rodadasSemPrioridadeNova(): Promise<number[]> {
+  const { data: m } = await db().from("settings").select("valor").eq("chave", CHAVE_PRIORIDADE).maybeSingle();
+  const ate = Number(m?.valor ?? 0);
+  const { data } = await db().from("runs").select("id").eq("status", "pronta").gt("id", ate).order("id").limit(1000);
+  return (data ?? []).map((r) => r.id as number);
+}
+
+/** Refaz os leads de algumas rodadas (da mais antiga para a mais nova, para a última valer). Status/notas não mudam. */
+export async function recalcularPrioridades(porVez = 3): Promise<{ feitas: number[]; faltam: number }> {
+  const pendentes = await rodadasSemPrioridadeNova();
+  const feitas: number[] = [];
+  for (const r of pendentes.slice(0, porVez)) {
+    await gerarLeads(r);
+    await db().from("settings").upsert({ chave: CHAVE_PRIORIDADE, valor: r }, { onConflict: "chave" });
+    feitas.push(r);
+  }
+  return { feitas, faltam: pendentes.length - feitas.length };
+}

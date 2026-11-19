@@ -5,6 +5,9 @@ export type Prioridade = "Máxima" | "Alta" | "Normal" | "Baixa";
 
 export type PresencaRegiao = {
   regiao: string; ddd: string; presenca: number; forca: string; pctSitelinks: number; duplicado: number;
+  buscas?: number;                                   // buscas feitas na região
+  // Onde ele anuncia: só as cidades em que apareceu (quando não aparece na região toda). null = sem esse dado.
+  foco?: { cidades: string[]; buscas: number; aparicoes: number; presenca: number; forca: string } | null;
 };
 export type SiteResumo = {
   situacao: string; motivo: string | null; telefones: string[]; whatsapps: string[];
@@ -14,6 +17,7 @@ export type EntradaLead = {
   dominio: string; regioes: PresencaRegiao[]; site: SiteResumo | null;
   cnpjs?: string[]; razaoSocial?: string | null;      // da consulta de CNPJ (só dígitos)
   palavraErrada?: string[] | null;                    // termos anunciados que o site não menciona (null = ok/não verificado)
+  cliente?: boolean;                                  // já é cliente da Connect (status "Cliente Connect")
 };
 export type Contexto = {
   dominiosPorTelefone: Map<string, Set<string>>;   // numero → domínios que divulgam
@@ -50,9 +54,14 @@ export function montarContexto(
 export function avaliarLead(e: EntradaLead, ctx: Contexto): SaidaLead {
   const obs: string[] = [];
   const perfil = e.dominio.startsWith("perfil-google:");
-  const principalRegiao = [...e.regioes].sort((a, b) => b.presenca - a.presenca)[0];
-  const forca = principalRegiao?.forca ?? "Fraca";
-  const presenca = principalRegiao?.presenca ?? 0;
+  // Força medida ONDE ELE ANUNCIA: se aparece só em algumas cidades da região, conta só elas
+  // (antes contava a região inteira e quase ninguém que anuncia em poucas cidades saía "Forte").
+  const efetiva = (r: PresencaRegiao) => (r.foco && r.foco.buscas >= 5 ? r.foco.presenca : r.presenca);
+  const principalRegiao = [...e.regioes].sort((a, b) => efetiva(b) - efetiva(a))[0];
+  const focoP = principalRegiao?.foco && principalRegiao.foco.buscas >= 5 ? principalRegiao.foco : null;
+  const forca = focoP?.forca ?? principalRegiao?.forca ?? "Fraca";
+  const presenca = principalRegiao ? efetiva(principalRegiao) : 0;
+  const amostraPequena = (focoP?.buscas ?? principalRegiao?.buscas ?? 99) < 5;
   const dddRegiao = principalRegiao?.ddd ?? null;
   let baixa = false, maxima = false;
 
@@ -128,8 +137,22 @@ export function avaliarLead(e: EntradaLead, ctx: Contexto): SaidaLead {
   if (e.palavraErrada?.length) {
     obs.unshift(`Apareceu na busca de "${e.palavraErrada.slice(0, 2).join('", "')}" mas o site não fala disso: está anunciando na palavra-chave errada (pagando clique de quem procura outro serviço). Argumento forte.`);
   }
-  // palavra errada = desperdício de verba: sobe Normal para Alta
-  const prioridade: Prioridade = maxima ? "Máxima" : baixa ? "Baixa"
-    : forca === "Forte" && !e.palavraErrada?.length ? "Normal" : "Alta";
+  if (focoP && principalRegiao) {
+    obs.push(`Anuncia em ${focoP.cidades.slice(0, 3).join(", ")}${focoP.cidades.length > 3 ? "…" : ""}: lá aparece em ${focoP.aparicoes} de ${focoP.buscas} buscas ` +
+      `(${Math.round(focoP.presenca * 100)}%, ${focoP.forca.toLowerCase()}). Na região inteira: ${Math.round(principalRegiao.presenca * 100)}%.`);
+  }
+  if (amostraPequena) obs.push("Poucas buscas nesta rodada: a força ainda não é confiável.");
+
+  // Prioridade ALTA só com sinal concreto de que está perdendo dinheiro:
+  //  - fraco ONDE ANUNCIA (com amostra suficiente), ou
+  //  - anunciando na palavra errada, ou
+  //  - problema no site/página do anúncio (não abriu para o robô, 404, cadeado inválido).
+  // "Sem tag" e "sem sitelinks" sozinhos NÃO bastam (muita conta boa mede ligação pelo próprio anúncio).
+  const problemaSite = !!s && (s.situacao === "nao_verificado" ||
+    (s.situacao === "ok" && /^(Página do anúncio|A página do anúncio|Certificado de segurança inválido)/.test(s.motivo ?? "")));
+  const fracoOndeAnuncia = forca === "Fraca" && !amostraPequena;
+  const sinalForte = fracoOndeAnuncia || !!e.palavraErrada?.length || problemaSite;
+  if (e.cliente) obs.unshift("CLIENTE DA CONNECT: não prospectar.");
+  const prioridade: Prioridade = e.cliente ? "Baixa" : maxima ? "Máxima" : baixa ? "Baixa" : sinalForte ? "Alta" : "Normal";
   return { prioridade, telefonePrincipal: principal?.formatado ?? null, outrosTelefones: outros, observacoes: obs, forca, presenca };
 }

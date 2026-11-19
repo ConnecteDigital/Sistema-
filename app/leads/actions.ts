@@ -16,6 +16,8 @@ export async function atualizarLead(id: number, campo: "status" | "responsavel_i
   const anterior = (antes as Record<string, unknown> | null)?.[campo];
   if (campo === "status" && anterior !== v) {
     await db().from("lead_events").insert({ lead_id: id, tipo: "status", texto: `${anterior ?? "—"} → ${v}` });
+    // Cliente da Connect sai da prospecção na hora (a próxima rodada mantém, porque lê o status)
+    if (v === "Cliente Connect") await db().from("leads").update({ prioridade: "Baixa" }).eq("id", id);
   }
   if (campo === "notas") await db().from("lead_events").insert({ lead_id: id, tipo: "nota", texto: String(v ?? "") });
   revalidatePath("/leads");

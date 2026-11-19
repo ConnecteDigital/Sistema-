@@ -94,12 +94,14 @@ export default async function Lead({ params }: { params: Promise<{ id: string }>
         <section className="cartao space-y-2 p-4 text-sm">
           <h2 className="font-semibold">Mensagem pronta</h2>
           <p className="text-xs text-suave">Monta a abordagem com a análise deste lead e abre o seu WhatsApp já com o texto escrito.</p>
-          <MensagemPronta telefone={lead.telefone_principal ?? null} dados={{
+          {lead.status === "Cliente Connect"
+            ? <p className="rounded-md bg-amber-50 p-2 text-xs text-amber-900">Este lead é <strong>cliente da Connect</strong>: não prospectar.</p>
+            : <MensagemPronta telefone={lead.telefone_principal ?? null} dados={{
             empresa: adv.nome ?? adv.dominio, dominio: perfil ? null : adv.dominio,
             siteFora: !!s && ["fora_do_ar", "suspenso", "dns"].includes(s.situacao),
             semTag: !!s && s.situacao === "ok" && s.tag_google === "nao",
             abordagem: abordagemParaCliente(analise?.abordagem, analise?.amostraPequena ?? true),
-          }} />
+          }} />}
         </section>
       </div>
 

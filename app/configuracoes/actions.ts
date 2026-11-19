@@ -208,3 +208,14 @@ export async function reverificarForaDoArAcao(_: Resultado): Promise<Resultado> 
     return { ok: false, msg: e instanceof Error ? e.message : String(e) };
   }
 }
+
+export async function recalcularPrioridadesAcao(): Promise<{ ok: boolean; msg: string; faltam: number }> {
+  const { recalcularPrioridades } = await import("@/lib/manutencao");
+  try {
+    const r = await recalcularPrioridades();
+    if (!r.faltam) { revalidatePath("/leads"); revalidatePath("/rodadas"); revalidatePath("/relatorios"); }
+    return { ok: true, msg: r.feitas.length ? `Refeitas: ${r.feitas.map((x) => "#" + x).join(", ")}.` : "Nada para refazer.", faltam: r.faltam };
+  } catch (e) {
+    return { ok: false, msg: e instanceof Error ? e.message : String(e), faltam: 0 };
+  }
+}

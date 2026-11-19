@@ -2,6 +2,7 @@ import { db } from "@/lib/supabase";
 import { variaveisFaltando } from "@/lib/env";
 import { formatarData } from "@/lib/utils";
 import { AvisoConfiguracao } from "@/components/aviso-configuracao";
+import { BotaoRecalcularPrioridades } from "./recalcular";
 import { BotaoAtualizarRodadas, BotaoCorrigirPlataformas, BotaoReverificarForaDoAr, BotaoEnviar, BotaoValidarLocais, FormNovaChave } from "./formularios";
 import {
   adicionarNicho, adicionarPessoa, adicionarVariacao, alternarChave, removerVariacao, atualizarTodosCreditos, excluirChave, removerPessoa, salvarLimiteTroca,
@@ -30,6 +31,8 @@ export default async function Configuracoes() {
   const faltaSeparar = !!misturados.error || (misturados.count ?? 0) > 0;
   const { contarFalsosForaDoAr } = await import("@/lib/manutencao");
   const falsosForaDoAr = await contarFalsosForaDoAr();
+  const { rodadasSemPrioridadeNova } = await import("@/lib/manutencao");
+  const semPrioridadeNova = (await rodadasSemPrioridadeNova().catch(() => [])).length;
   const [chaves, equipe, regioes, locais, nichos] = await Promise.all([
     db().from("serp_keys").select("*").order("id"),
     db().from("equipe").select("id, nome").eq("ativo", true).order("nome"),
@@ -243,6 +246,18 @@ export default async function Configuracoes() {
           </>
         ) : (
           <p className="pt-2 text-sm text-green-700">✓ Todas as rodadas já têm a presença por cidade e a nova leitura do site.</p>
+        )}
+        {semPrioridadeNova > 0 ? (
+          <>
+            <p className="pt-2 text-sm text-suave">
+              Prioridade nova dos leads: a força é medida só nas cidades onde cada anunciante anuncia, e "Alta" só aparece com sinal
+              concreto (fraco onde anuncia, palavra-chave errada ou problema no site). {semPrioridadeNova} rodada(s) ainda com a regra antiga.
+              Não gasta crédito; status, responsável e notas não mudam.
+            </p>
+            <BotaoRecalcularPrioridades total={semPrioridadeNova} />
+          </>
+        ) : (
+          <p className="pt-2 text-sm text-green-700">✓ Todos os leads já estão com a prioridade nova.</p>
         )}
         {falsosForaDoAr > 0 && (
           <>

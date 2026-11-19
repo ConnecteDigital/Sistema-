@@ -3,7 +3,7 @@ import { db } from "./supabase";
 import { descriptografar } from "./crypto";
 import { buscarAnuncios, consultarConta, type OrganicoSerpApi } from "./serpapi";
 import { identificarAnunciante } from "./dominio";
-import { agregar, agregarOrganico, organicoDe, type AdBruto, type BuscaOk, type Limites, type OrgBruto } from "./agregacao";
+import { agregar, forcaDe, agregarOrganico, organicoDe, type AdBruto, type BuscaOk, type Limites, type OrgBruto } from "./agregacao";
 import { verificarUrl } from "./site";
 import { dominioRaiz, hostDe } from "./dominio";
 import { avaliarLead, montarContexto, type PresencaRegiao, type SiteResumo } from "./regras";
@@ -521,10 +521,26 @@ async function atualizarPalavraNoSite(linhas: { id: number; advertiser_id: numbe
 
 export async function gerarLeads(runId: number) {
   type L = { id: number; advertiser_id: number; presenca: number; forca: string; pct_sitelinks: number; duplicado_mesma_busca: number;
-    termos: string[]; advertisers: { dominio: string }; regions: { nome: string; ddd: string } };
-  const linhas = await todas<L>((de, ate) => db().from("run_advertisers")
-    .select("id, advertiser_id, presenca, forca, pct_sitelinks, duplicado_mesma_busca, termos, advertisers(dominio), regions(nome, ddd)")
-    .eq("run_id", runId).order("id").range(de, ate) as never);
+    termos: string[]; buscas: number; por_ponto?: { p: string; b: number; a: number }[] | null;
+    advertisers: { dominio: string }; regions: { nome: string; ddd: string } };
+  const CAMPOS_L = "id, advertiser_id, presenca, forca, pct_sitelinks, duplicado_mesma_busca, termos, buscas, advertisers(dominio), regions(nome, ddd)";
+  let linhas: L[];
+  try {
+    linhas = await todas<L>((de, ate) => db().from("run_advertisers").select(CAMPOS_L + ", por_ponto")
+      .eq("run_id", runId).order("id").range(de, ate) as never);
+  } catch {   // banco sem o 0014 (presença por cidade)
+    linhas = await todas<L>((de, ate) => db().from("run_advertisers").select(CAMPOS_L)
+      .eq("run_id", runId).order("id").range(de, ate) as never);
+  }
+  const { limites } = await lerSettings();
+
+  // Quem já é cliente da Connect (status "Cliente Connect") não entra na prospecção
+  const advIds = [...new Set(linhas.map((l) => l.advertiser_id))];
+  const clientes = new Set<number>();
+  for (let i = 0; i < advIds.length; i += 300) {
+    const { data } = await db().from("leads").select("advertiser_id").eq("status", "Cliente Connect").in("advertiser_id", advIds.slice(i, i + 300));
+    for (const c of data ?? []) clientes.add(c.advertiser_id as number);
+  }
 
   // Contexto global: últimas verificações dos últimos 90 dias (para achar redes e mesmo dono)
   const desde = new Date(Date.now() - 90 * 86_400_000).toISOString();
@@ -552,9 +568,14 @@ export async function gerarLeads(runId: number) {
   const grupos = new Map<number, { dominio: string; regioes: PresencaRegiao[] }>();
   for (const l of linhas) {
     if (!grupos.has(l.advertiser_id)) grupos.set(l.advertiser_id, { dominio: l.advertisers.dominio, regioes: [] });
+    const pp = (l.por_ponto ?? []).filter((x) => x.b > 0);
+    const com = pp.filter((x) => x.a > 0);
+    const temFoco = com.length > 0 && com.length < pp.length;
+    const fb = com.reduce((s2, x) => s2 + x.b, 0), fa = com.reduce((s2, x) => s2 + x.a, 0);
     grupos.get(l.advertiser_id)!.regioes.push({
       regiao: l.regions.nome, ddd: l.regions.ddd, presenca: Number(l.presenca), forca: l.forca,
-      pctSitelinks: Number(l.pct_sitelinks), duplicado: l.duplicado_mesma_busca,
+      pctSitelinks: Number(l.pct_sitelinks), duplicado: l.duplicado_mesma_busca, buscas: Number(l.buscas),
+      foco: temFoco && fb ? { cidades: com.map((x) => x.p), buscas: fb, aparicoes: fa, presenca: fa / fb, forca: forcaDe(fa / fb, limites) } : null,
     });
   }
 
@@ -565,7 +586,7 @@ export async function gerarLeads(runId: number) {
     const pal = palavraPorId.get(advertiserId);
     const palavraErrada = pal?.verificado && !pal.algumOk ? [...pal.ausentes] : null;
     const r = avaliarLead({ dominio: g.dominio, regioes: g.regioes, site: c ? resumoSite(c) : null,
-      cnpjs: cj?.cnpjs, razaoSocial: cj?.razao, palavraErrada }, ctx);
+      cnpjs: cj?.cnpjs, razaoSocial: cj?.razao, palavraErrada, cliente: clientes.has(advertiserId) }, ctx);
     return {
       advertiser_id: advertiserId, prioridade: r.prioridade, telefone_principal: r.telefonePrincipal,
       outros_telefones: r.outrosTelefones, observacoes: r.observacoes, forca: r.forca,
