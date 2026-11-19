@@ -36,20 +36,35 @@ export function MarcarLead({ id, nome }: { id: number; nome: string }) {
   );
 }
 
+// Número da última leva baixada: a próxima sugere "Prospec 2", "Prospec 3"… (a 1ª leva foi salva como "Prospec")
+const CHAVE_LEVA = "contatos-ultima-leva";
+function ultimaLeva() { try { return Number(localStorage.getItem(CHAVE_LEVA) ?? "1") || 1; } catch { return 1; } }
+
 /** Barra com os leads marcados (de qualquer busca), para conferir, desmarcar e baixar. */
 export function BarraMarcados() {
   const lista = useMarcados();
   const [aberto, setAberto] = useState(false);
+  const [prefixo, setPrefixo] = useState("Prospec 2");
+  useEffect(() => { setPrefixo(`Prospec ${ultimaLeva() + 1}`); }, []);
+  const baixou = () => {
+    const n = Number(prefixo.match(/(\d+)\s*$/)?.[1]);
+    if (n) { try { localStorage.setItem(CHAVE_LEVA, String(n)); } catch { /* ignora */ } }
+    setTimeout(() => setPrefixo(`Prospec ${(n || ultimaLeva()) + 1}`), 500);
+  };
   if (!lista.length) {
     return <p className="text-xs text-suave">📇 Marque leads na primeira coluna (pode buscar e filtrar à vontade: a marcação fica guardada) e baixe os contatos de uma vez.</p>;
   }
-  const link = `/api/leads/contatos?${lista.map((m) => `id=${m.id}`).join("&")}`;
+  const link = `/api/leads/contatos?prefixo=${encodeURIComponent(prefixo)}&${lista.map((m) => `id=${m.id}`).join("&")}`;
   return (
     <div className="cartao space-y-2 border-marca/40 p-3 text-sm">
       <div className="flex flex-wrap items-center gap-2">
         <strong>📇 {lista.length} lead(s) marcado(s)</strong>
         <button type="button" onClick={() => setAberto((a) => !a)} className="text-xs text-marca hover:underline">{aberto ? "esconder" : "ver quais"}</button>
-        <a href={link} target="_blank" rel="noreferrer" className="botao ml-auto">Baixar contatos (.vcf)</a>
+        <label className="ml-auto flex items-center gap-1 text-xs">Salvar como
+          <input value={prefixo} onChange={(e) => setPrefixo(e.target.value)} maxLength={30} className="campo w-28 py-1" />
+          <span className="text-suave">- Nome</span>
+        </label>
+        <a href={link} target="_blank" rel="noreferrer" onClick={baixou} className="botao">Baixar contatos (.vcf)</a>
         <button type="button" onClick={() => gravar([])} className="botao-sec">Desmarcar todos</button>
       </div>
       {aberto && (
