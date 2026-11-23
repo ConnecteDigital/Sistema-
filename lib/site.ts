@@ -222,7 +222,7 @@ export async function verificarUrl(url: string): Promise<{ pagina: Pagina; a: An
   // Falha de DNS: o domínio existe mesmo?
   if (a.situacao === "dns") {
     const existe = await dominioExiste(u.hostname);
-    if (existe === false) return { pagina, a };   // confirmado: domínio não existe
+    if (existe === false) return { pagina, a: { ...a, motivo: "Domínio não existe (confirmado no DNS público do Google)" } };
     await espera(1500);
     const p2 = await baixarPagina(url, 15_000, UA_PC);
     const a2 = analisarPagina(p2);

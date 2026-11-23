@@ -62,15 +62,18 @@ export async function atualizarRodadasAntigas(porVez = 4): Promise<{ feitas: num
   return { feitas, faltam: Math.max(0, pendentes.length - feitas.length) };
 }
 
-// Verificações feitas antes da regra nova de "fora do ar" (só com prova firme)
-const CORRECAO_FORA_DO_AR = "2026-11-18T14:40:00Z";
-// todos os "fora do ar" / "domínio não existe" da regra antiga (a nova só marca assim com prova firme)
+// "Fora do ar" que NÃO tem prova firme (regra antiga): tudo que não for domínio à venda/expirado ou DNS confirmado.
+// (Não usa data: qualquer verificação antiga que escapou volta para a lista.)
 const SITUACOES_A_REVER = ["fora_do_ar", "dns"];
+type Consulta = { not: (c: string, op: string, v: string) => Consulta };
+const semProvaFirme = <T,>(q: T) => (q as unknown as Consulta)
+  .not("motivo", "ilike", "Domínio estacionado%")
+  .not("motivo", "ilike", "%confirmado no DNS%") as unknown as T;
 
 /** Quantos sites foram marcados "fora do ar" pela regra antiga e precisam ser conferidos de novo. */
 export async function contarFalsosForaDoAr(): Promise<number> {
-  const { count, error } = await db().from("site_checks_recentes").select("advertiser_id", { count: "exact", head: true })
-    .in("situacao", SITUACOES_A_REVER).lt("verificado_em", CORRECAO_FORA_DO_AR);
+  const { count, error } = await semProvaFirme(db().from("site_checks_recentes").select("advertiser_id", { count: "exact", head: true })
+    .in("situacao", SITUACOES_A_REVER));
   return error ? 0 : (count ?? 0);
 }
 
@@ -80,8 +83,8 @@ export async function contarFalsosForaDoAr(): Promise<number> {
  */
 export async function reverificarFalsosForaDoAr(porVez = 16): Promise<{ verificados: number; abriram: string[]; faltam: number }> {
   type C = { advertiser_id: number; url: string; advertisers: { dominio: string } };
-  const { data, error } = await db().from("site_checks_recentes").select("advertiser_id, url, advertisers(dominio)")
-    .in("situacao", SITUACOES_A_REVER).lt("verificado_em", CORRECAO_FORA_DO_AR).limit(1000);
+  const { data, error } = await semProvaFirme(db().from("site_checks_recentes").select("advertiser_id, url, advertisers(dominio)")
+    .in("situacao", SITUACOES_A_REVER)).limit(1000);
   if (error) throw new Error(error.message);
   const lista = (data ?? []) as unknown as C[];
   const agora = lista.slice(0, porVez);

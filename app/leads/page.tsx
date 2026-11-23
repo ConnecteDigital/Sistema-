@@ -109,15 +109,17 @@ export default async function Leads({ searchParams }: { searchParams: Promise<SP
         </p>
       ) : (
         <div className="cartao overflow-x-auto">
-          <table className="w-full min-w-[1100px] text-sm">
+          <table className="w-full min-w-[880px] table-fixed text-sm">
+            <colgroup>
+              <col className="w-8" /><col className="w-[30%]" /><col className="w-[150px]" /><col /><col className="w-[175px]" />
+            </colgroup>
             <thead className="bg-slate-50 text-left text-xs uppercase text-suave">
               <tr>
                 <th className="px-2 py-2" title="Marque para baixar os contatos">📇</th>
-                <th className="px-3 py-2">Prioridade</th><th className="px-3 py-2">Anunciante</th>
-                <th className="px-3 py-2">Telefone</th><th className="px-3 py-2">Força</th>
+                <th className="px-3 py-2">Anunciante · prioridade · força</th>
+                <th className="px-3 py-2">Telefone</th>
                 <th className="px-3 py-2">Observações</th>
-                <th className="bg-yellow-50 px-3 py-2">Status</th><th className="bg-yellow-50 px-3 py-2">Responsável</th>
-                <th className="bg-yellow-50 px-3 py-2">Contato</th>
+                <th className="bg-yellow-50 px-3 py-2">Prospecção</th>
               </tr>
             </thead>
             <tbody>
@@ -127,14 +129,15 @@ export default async function Leads({ searchParams }: { searchParams: Promise<SP
                     {l.telefone_principal && <MarcarLead id={l.id} nome={l.advertisers.nome ?? l.advertisers.dominio} />}
                   </td>
                   <td className="px-3 py-2">
-                    {l.prioridade && <span className={`selo ${COR_PRIORIDADE[l.prioridade] ?? ""}`}>{l.prioridade}</span>}
-                  </td>
-                  <td className="px-3 py-2">
-                    <Link href={`/leads/${l.id}`} className="font-medium hover:underline">{l.advertisers.nome ?? l.advertisers.dominio}</Link>
+                    <div className="mb-1 flex flex-wrap items-center gap-1">
+                      {l.prioridade && <span className={`selo ${COR_PRIORIDADE[l.prioridade] ?? ""}`}>{l.prioridade}</span>}
+                      {l.forca && <span className={`selo ${COR_FORCA[l.forca] ?? ""}`}>{l.forca}{l.presenca !== null ? ` · ${Math.round(Number(l.presenca) * 100)}%` : ""}</span>}
+                    </div>
+                    <Link href={`/leads/${l.id}`} className="block break-words font-medium hover:underline">{l.advertisers.nome ?? l.advertisers.dominio}</Link>
                     {l.advertisers.dominio.startsWith("perfil-google:")
                       ? <span className="block text-xs text-suave">{l.advertisers.dominio.replace("perfil-google:", "perfil Google: ")}</span>
                       : <a href={`https://${l.advertisers.dominio}`} target="_blank" rel="noreferrer"
-                          className="block text-xs text-marca hover:underline">{l.advertisers.dominio} ↗</a>}
+                          className="block break-all text-xs text-marca hover:underline">{l.advertisers.dominio} ↗</a>}
                     {(l.razao_social || l.cnpj) && (
                       <span className="block text-[11px]">
                         {l.razao_social}{l.cnpj && <span className="ml-1 font-mono text-suave">{l.cnpj}</span>}
@@ -145,10 +148,10 @@ export default async function Leads({ searchParams }: { searchParams: Promise<SP
                     )}
                     <span className="block text-[11px] text-suave">{l.regioes.join(", ")}</span>
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2 text-xs">
+                  <td className="px-3 py-2 text-xs">
                     {l.telefone_principal ? (
                       <>
-                        <a href={`tel:${l.telefone_principal.replace(/\D/g, "")}`} className="font-medium hover:underline">{l.telefone_principal}</a>
+                        <a href={`tel:${l.telefone_principal.replace(/\D/g, "")}`} className="whitespace-nowrap font-medium hover:underline">{l.telefone_principal}</a>
                         {linkWhats(l.telefone_principal) && (
                           <a href={linkWhats(l.telefone_principal)!} target="_blank" rel="noreferrer" className="ml-1 text-green-700 hover:underline">zap</a>
                         )}
@@ -159,17 +162,15 @@ export default async function Leads({ searchParams }: { searchParams: Promise<SP
                       </>
                     ) : "—"}
                   </td>
-                  <td className="px-3 py-2">
-                    {l.forca && <span className={`selo ${COR_FORCA[l.forca] ?? ""}`}>{l.forca}</span>}
-                    {l.presenca !== null && <span className="block text-xs text-suave">{Math.round(Number(l.presenca) * 100)}%</span>}
-                  </td>
-                  <td className="max-w-[380px] px-3 py-2 text-xs text-suave">
-                    {l.observacoes.slice(0, 3).map((o) => <p key={o}>• {o}</p>)}
+                  <td className="px-3 py-2 text-xs text-suave">
+                    {l.observacoes.slice(0, 3).map((o) => <p key={o} className="mb-0.5">• {o}</p>)}
                     {l.observacoes.length > 3 && <Link href={`/leads/${l.id}`} className="text-marca">+{l.observacoes.length - 3}</Link>}
                   </td>
-                  <td className="px-3 py-2"><CampoStatus id={l.id} valor={l.status} /></td>
-                  <td className="px-3 py-2"><CampoResponsavel id={l.id} valor={l.responsavel_id} equipe={equipe.data ?? []} /></td>
-                  <td className="px-3 py-2"><CampoData id={l.id} valor={l.data_contato} /></td>
+                  <td className="space-y-1 bg-yellow-50/30 px-3 py-2 [&_input]:w-full [&_select]:w-full">
+                    <CampoStatus id={l.id} valor={l.status} />
+                    <CampoResponsavel id={l.id} valor={l.responsavel_id} equipe={equipe.data ?? []} />
+                    <CampoData id={l.id} valor={l.data_contato} />
+                  </td>
                 </tr>
               ))}
             </tbody>

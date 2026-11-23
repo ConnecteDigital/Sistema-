@@ -67,21 +67,16 @@ export function TabelaAnunciantes({ linhas }: { linhas: Linha[] }) {
       </div>
 
       <div className="cartao overflow-x-auto">
-        <table className="w-full min-w-[1250px] text-sm">
+        <table className="w-full min-w-[900px] text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase text-suave">
             <tr>
               {regioes.length > 1 && <th className="px-3 py-2">Região</th>}
               {temLeads && <th className="px-3 py-2">Prioridade</th>}
               <th className="px-3 py-2">Anunciante</th>
               <th className="px-3 py-2">Contato</th>
-              <th className="px-3 py-2 text-right">Anúncio pago</th>
-              <th className="px-3 py-2">Força (pago)</th>
-              <th className="px-3 py-2 text-right">Pos.</th>
-              <th className="px-3 py-2 text-right">Topo</th>
-              <th className="px-3 py-2 text-right">Sitelinks</th>
-              <th className="px-3 py-2 text-right">Orgânico</th>
-              <th className="px-3 py-2">Onde apareceu</th>
-              <th className="px-3 py-2">Anúncio</th>
+              <th className="px-3 py-2">Anúncio pago</th>
+              <th className="px-3 py-2">Orgânico</th>
+              <th className="px-3 py-2">Onde apareceu · anúncio</th>
               <th className="px-3 py-2">Empresa (CNPJ)</th>
             </tr>
           </thead>
@@ -137,15 +132,15 @@ export function TabelaAnunciantes({ linhas }: { linhas: Linha[] }) {
                       </>
                     ) : <span className="text-suave">—</span>}
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
-                    <span className="font-semibold">{pct(l.presenca)}</span>
-                    <span className="block text-xs text-suave">{l.aparicoes}/{l.buscas}</span>
+                  <td className="whitespace-nowrap px-3 py-2 tabular-nums">
+                    <span className={`selo ${COR_FORCA[l.forca] ?? ""}`}>{l.forca}</span>
+                    <span className="ml-1 font-semibold">{pct(l.presenca)}</span>
+                    <span className="block text-xs text-suave">{l.aparicoes}/{l.buscas} buscas</span>
+                    <span className="block text-[11px] text-suave">
+                      pos. {l.pos_media?.toFixed(1).replace(".", ",") ?? "—"} · topo {pct(l.pct_topo)} · sitelinks {pct(l.pct_sitelinks)}
+                    </span>
                   </td>
-                  <td className="px-3 py-2"><span className={`selo ${COR_FORCA[l.forca] ?? ""}`}>{l.forca}</span></td>
-                  <td className="px-3 py-2 text-right tabular-nums">{l.pos_media?.toFixed(1) ?? "—"}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{pct(l.pct_topo)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{pct(l.pct_sitelinks)}</td>
-                  <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+                  <td className="whitespace-nowrap px-3 py-2 tabular-nums">
                     {l.organico ? (
                       <>
                         <span className="font-semibold">{l.organico.aparicoes}/{l.organico.buscas}</span>
@@ -155,14 +150,12 @@ export function TabelaAnunciantes({ linhas }: { linhas: Linha[] }) {
                       </>
                     ) : <span className="text-xs text-suave">não medido</span>}
                   </td>
-                  <td className="max-w-[220px] px-3 py-2 text-xs text-suave">
-                    {l.pontos.join(", ")}
-                    <span className="mt-0.5 block text-[11px]">{l.termos.join(" · ")}</span>
-                  </td>
-                  <td className="max-w-[240px] px-3 py-2 text-xs">
-                    {l.titulo}
+                  <td className="max-w-[260px] px-3 py-2 text-xs">
+                    <span className="text-suave">{l.pontos.join(", ")}</span>
+                    <span className="mt-0.5 block text-[11px] text-suave">{l.termos.join(" · ")}</span>
+                    {l.titulo && <span className="mt-1 block">“{l.titulo}”</span>}
                     {l.link && (
-                      <a href={l.link} target="_blank" rel="noreferrer" className="mt-0.5 block text-marca hover:underline">abrir</a>
+                      <a href={l.link} target="_blank" rel="noreferrer" className="mt-0.5 block text-marca hover:underline">abrir anúncio ↗</a>
                     )}
                   </td>
                   <td className="px-3 py-2">
@@ -190,7 +183,7 @@ export function TabelaAnunciantes({ linhas }: { linhas: Linha[] }) {
       <p className="text-xs text-suave">
         Força (pago): o anúncio aparece em menos de 40% das buscas da região = Fraca · 40–75% = Média · mais de 75% = Forte.
         Orgânico: em quantas buscas o site aparece na 1ª página sem anúncio, e a posição média. É uma foto deste horário.
-        {temLeads && " Prioridade: Máxima = site fora do ar · Alta = força Fraca/Média · Normal = Forte · Baixa = rede, 0800 ou agência."}
+        {temLeads && " Prioridade: Máxima = site fora do ar (confirmado) · Alta = fraco onde anuncia, palavra-chave errada ou problema na página do anúncio · Normal = o resto · Baixa = rede, 0800, agência ou cliente da Connect."}
       </p>
     </div>
   );
