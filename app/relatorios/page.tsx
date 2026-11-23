@@ -49,7 +49,7 @@ const ROTULO_COMP: Record<Comparacao, string> = {
 export default async function Relatorios({ searchParams }: { searchParams: Promise<{ rodada?: string; rodadas?: string; so?: string }> }) {
   const { rodada, rodadas: rodadasParam, so } = await searchParams;
   const { data: rodadas } = await db().from("runs").select("id, criado_em, termos, status")
-    .eq("status", "pronta").order("id", { ascending: false }).limit(50);
+    .eq("status", "pronta").order("id", { ascending: false }).limit(2000);
   const lista = rodadas ?? [];
   if (!lista.length) {
     return (

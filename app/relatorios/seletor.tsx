@@ -8,6 +8,9 @@ export function SeletorRodadas({ atuais, rodadas }: { atuais: number[]; rodadas:
   const router = useRouter();
   const [aberto, setAberto] = useState(false);
   const [sel, setSel] = useState<number[]>(atuais);
+  const [busca, setBusca] = useState("");
+  const termo = busca.trim().toLowerCase().replace(/^#/, "");
+  const visiveis = termo ? rodadas.filter((r) => r.rotulo.toLowerCase().includes(termo) || String(r.id) === termo) : rodadas;
   const ver = (ids: number[]) => router.push(ids.length > 1 ? `/relatorios?rodadas=${[...ids].sort((a, b) => a - b).join(",")}` : `/relatorios?rodada=${ids[0]}`);
   const atual = rodadas.filter((r) => atuais.includes(r.id)).sort((a, b) => a.id - b.id);
   return (
@@ -26,9 +29,15 @@ export function SeletorRodadas({ atuais, rodadas }: { atuais: number[]; rodadas:
       </div>
       {aberto && (
         <div className="cartao max-w-xl space-y-2 p-3 text-sm">
-          <p className="text-xs text-suave">Marque as rodadas para ver tudo junto, sem repetir anunciante, e comparar os horários:</p>
-          <div className="max-h-56 space-y-1 overflow-y-auto">
-            {rodadas.map((r) => (
+          <p className="text-xs text-suave">Marque as rodadas para ver tudo junto, sem repetir anunciante, e comparar os horários ({rodadas.length} rodadas):</p>
+          <div className="flex gap-2">
+            <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar: número, data ou palavra (ex.: 12, 15/11, encanador)"
+              className="campo w-full py-1 text-xs" />
+            {sel.length > 0 && <button type="button" onClick={() => setSel([])} className="whitespace-nowrap text-xs text-marca hover:underline">limpar ({sel.length})</button>}
+          </div>
+          <div className="max-h-72 space-y-1 overflow-y-auto">
+            {!visiveis.length && <p className="text-xs text-suave">Nenhuma rodada com esse texto.</p>}
+            {visiveis.map((r) => (
               <label key={r.id} className="flex items-start gap-2">
                 <input type="checkbox" className="mt-1" checked={sel.includes(r.id)}
                   onChange={() => setSel((x) => x.includes(r.id) ? x.filter((y) => y !== r.id) : [...x, r.id])} />

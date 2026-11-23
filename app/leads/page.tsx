@@ -51,7 +51,7 @@ export default async function Leads({ searchParams }: { searchParams: Promise<SP
   }
   const [equipe, rodadasDb, todasRegioes] = await Promise.all([
     db().from("equipe").select("id, nome").eq("ativo", true).order("nome"),
-    db().from("runs").select("id, criado_em, termos, status").order("id", { ascending: false }).limit(60),
+    db().from("runs").select("id, criado_em, termos, status").order("id", { ascending: false }).limit(2000),
     db().from("regions").select("nome").order("nome"),
   ]);
   type L = { id: number; prioridade: string | null; telefone_principal: string | null; outros_telefones: string[];
