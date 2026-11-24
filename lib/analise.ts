@@ -34,6 +34,10 @@ export type Analise = {
 
 /** Abaixo disso, a presença (ex.: 1/1 = 100%) não serve para concluir nada. */
 export const AMOSTRA_MINIMA = 5;
+/** Para o "O que falar" (texto que vai para o cliente) exige mais: com menos buscas, nada de número na mensagem. */
+export const AMOSTRA_FALA = 10;
+/** Posição ("1º lugar", "atrás de concorrentes") só com pelo menos 3 aparições: 1 aparição é uma foto, não um padrão. */
+export const APARICOES_POSICAO = 3;
 
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 const lista = (xs: string[], max = 3) =>
@@ -79,8 +83,9 @@ export function analisarAnuncio(aparicoes: Aparicao[]): Analise | null {
   const p = b.presenca;
   const pequena = b.buscas < AMOSTRA_MINIMA;
   const pos = b.posMedia;
-  const noTopo = pos !== null && pos <= 1.5;
-  const atras = pos !== null && pos >= 2.5;
+  const posConfiavel = pos !== null && b.aparicoes >= APARICOES_POSICAO;
+  const noTopo = posConfiavel && pos! <= 1.5;
+  const atras = posConfiavel && pos! >= 2.5;
   const umPonto = b.pontos.length === 1;
   const leitura: string[] = [], causas: string[] = [], cuidados: string[] = [];
   const quando = b.rodada ? `Na rodada #${b.rodada}` : "Nesta pesquisa";
@@ -116,7 +121,8 @@ export function analisarAnuncio(aparicoes: Aparicao[]): Analise | null {
     leitura.push("Aparece quase sempre: é um anunciante que investe de forma constante.");
   }
   if (pos !== null) {
-    if (noTopo) leitura.push("Quando aparece, fica em 1º lugar: o anúncio em si é bom (lance e qualidade em dia).");
+    if (!posConfiavel) leitura.push(`Posição: o anúncio apareceu só ${b.aparicoes} ${b.aparicoes === 1 ? "vez" : "vezes"}, pouco para dizer se fica na frente ou atrás dos concorrentes.`);
+    else if (noTopo) leitura.push("Quando aparece, fica em 1º lugar: o anúncio em si é bom (lance e qualidade em dia).");
     else if (atras) leitura.push(`Quando aparece, fica em média na posição ${pos.toFixed(1).replace(".", ",")} (1 = primeiro anúncio): tem concorrente pagando mais ou com anúncio melhor na frente.`);
     else leitura.push(`Quando aparece, fica entre o 1º e o 2º lugar (posição média ${pos.toFixed(1).replace(".", ",")}).`);
   }
@@ -145,21 +151,21 @@ export function analisarAnuncio(aparicoes: Aparicao[]): Analise | null {
   } else if (usaFoco && P > 0.75) {
     abordagem = `Em ${lista(f!.cidades)}, onde você anuncia, o seu anúncio aparece em ${AA} de ${BB} buscas: lá está forte. ` +
       `Nas cidades vizinhas (${lista(f!.outras)}) ele não aparece. Se você também atende essas cidades, são clientes procurando o seu serviço e ligando para outra empresa.`;
-    if (atras) abordagem += ` E, quando aparece, fica atrás de concorrentes (posição média ${pos!.toFixed(1).replace(".", ",")}).`;
+    if (atras) abordagem += ` E, nas vezes em que aparece, fica em média na ${Math.round(pos!)}ª posição, com concorrente acima.`;
   } else if (P < 0.4 && !atras) {
     causas.push("Verba diária acabando cedo (o anúncio some no resto do dia).",
       usaFoco ? "Lance ou horário de veiculação limitados." : umPonto ? `Área do anúncio configurada só para ${b.pontos[0]}.` : "Área do anúncio menor que a região que ele atende.",
       "Poucas palavras-chave (não aparece em buscas parecidas).");
-    abordagem = `Fizemos ${BB} buscas ${ONDE} e o seu anúncio só apareceu em ${AA}.${noTopo ? ` Quando aparece, fica em 1º lugar, então o problema não é a qualidade do anúncio: é verba, horário${usaFoco ? "" : " ou área configurada"}.` : ""} Dá para aparecer muito mais sem necessariamente gastar mais.`;
+    abordagem = `Nas ${BB} buscas que fizemos ${ONDE}, o seu anúncio apareceu em ${AA}.${noTopo ? ` Quando aparece, fica em 1º lugar, então o problema não é a qualidade do anúncio: é verba, horário${usaFoco ? "" : " ou área configurada"}.` : ""} Dá para aparecer muito mais sem necessariamente gastar mais.`;
   } else if (P < 0.4 && atras) {
     causas.push("Lance baixo ou anúncio com nota de qualidade fraca: perde o leilão para os concorrentes.", usaFoco ? "Verba curta ou poucas palavras-chave." : "Verba curta e área ou palavras-chave limitadas.");
-    abordagem = `Fizemos ${BB} buscas ${ONDE}: o seu anúncio apareceu em ${AA} e, quando apareceu, ficou atrás dos concorrentes. Quem procura o serviço está ligando para eles primeiro. Dá para melhorar o anúncio e a página para aparecer mais e pagar menos por clique.`;
+    abordagem = `Nas ${BB} buscas que fizemos ${ONDE}, o seu anúncio apareceu em ${AA} e, nessas vezes, ficou em média na ${Math.round(pos!)}ª posição, com concorrente acima. Quem procura o serviço tende a ligar para quem aparece primeiro. Dá para melhorar o anúncio e a página para aparecer mais e pagar menos por clique.`;
   } else if (P <= 0.75) {
     causas.push("Verba que não cobre o dia todo ou lance no limite.", usaFoco ? "Algumas palavras-chave de fora da campanha." : "Algumas palavras-chave ou cidades de fora da campanha.");
-    abordagem = `O seu anúncio fica de fora em ${deCada10(P)} de cada 10 buscas ${ONDE}${atras ? " e, quando aparece, fica atrás de concorrentes" : ""}. São clientes procurando o seu serviço e encontrando outra empresa. Dá para cobrir esse buraco ajustando a campanha.`;
+    abordagem = `O seu anúncio fica de fora em ${deCada10(P)} de cada 10 buscas ${ONDE}${atras ? ` e, quando aparece, fica em média na ${Math.round(pos!)}ª posição` : ""}. São clientes procurando o seu serviço e encontrando outra empresa. Dá para cobrir esse buraco ajustando a campanha.`;
   } else if (atras) {
     causas.push("Concorrentes com lance maior ou anúncio melhor avaliado.");
-    abordagem = `Seu anúncio aparece quase sempre, mas fica atrás de concorrentes (posição média ${pos!.toFixed(1).replace(".", ",")}). Melhorando a qualidade do anúncio e da página dá para subir de posição sem aumentar o lance.`;
+    abordagem = `Seu anúncio aparece quase sempre, mas em média na ${Math.round(pos!)}ª posição, com concorrente acima. Melhorando a qualidade do anúncio e da página dá para subir de posição sem aumentar o lance.`;
   } else {
     abordagem = "A presença está forte e o anúncio fica no topo: aqui o argumento não é aparecer mais. Vá pelos outros pontos (site, medição de conversões, palavra-chave, custo por cliente).";
   }
@@ -195,14 +201,14 @@ export function analisarAnuncio(aparicoes: Aparicao[]): Analise | null {
         : p < 0.4 ? "Dá para melhorar o anúncio e a página para aparecer mais e pagar menos por clique."
         : "Dá para cobrir esse buraco ajustando a campanha.";
       abordagem = `Fizemos ${b.buscas} buscas na sua região. No orgânico o seu site ${fo === "forte" ? "está muito bem" : "aparece"}: ` +
-        `apareceu em ${o.aparicoes} delas${posOrg}. Já o seu anúncio pago apareceu em ${b.aparicoes}${atras ? ", e atrás dos concorrentes" : ""}. ` +
+        `apareceu em ${o.aparicoes} delas${posOrg}. Já o seu anúncio pago apareceu em ${b.aparicoes}${atras ? `, em média na ${Math.round(pos!)}ª posição` : ""}. ` +
         `Os anúncios patrocinados aparecem antes do orgânico, e quem clica neles está indo para outras empresas. ${final}`;
     } else if ((fo === "ausente" || fo === "fraca") && p <= 0.75) {
       abordagem += fo === "ausente"
         ? ` E no orgânico o seu site não apareceu na 1ª página em nenhuma das ${o.buscas} buscas: hoje, quem pesquisa na região quase não te encontra no Google.`
         : ` E no orgânico o site também aparece pouco (em ${o.aparicoes} das ${o.buscas} buscas).`;
     } else if (p > 0.75 && fo === "ausente") {
-      abordagem = `Seu anúncio aparece quase sempre${atras ? ", mas atrás de concorrentes" : ""}. Só que no orgânico o seu site não apareceu na 1ª página em nenhuma das ${o.buscas} buscas: ` +
+      abordagem = `Seu anúncio aparece quase sempre${atras ? `, mas em média na ${Math.round(pos!)}ª posição` : ""}. Só que no orgânico o seu site não apareceu na 1ª página em nenhuma das ${o.buscas} buscas: ` +
         "você depende 100% do anúncio pago. Se a verba parar, o telefone para. Dá para trabalhar o site para aparecer também no orgânico.";
     } else if (p > 0.75 && fo === "fraca") {
       abordagem += ` No orgânico o site aparece pouco (${o.aparicoes} de ${o.buscas} buscas): ele depende quase só do anúncio pago.`;
@@ -223,12 +229,22 @@ export function analisarAnuncio(aparicoes: Aparicao[]): Analise | null {
     cuidados.push(`Se ele atende só ${b.pontos[0]} de propósito, é normal não aparecer nas outras cidades. Pergunte isso antes de afirmar que está perdendo clientes.`);
   }
   if (!pequena && P < 0.75) cuidados.push("Pergunte se a verba acaba antes do fim do dia: é a causa mais comum e ele costuma saber.");
+  if (!pequena) cuidados.push("Quem anuncia costuma se ver em 1º quando pesquisa: o Google personaliza o resultado e o próprio dono pesquisa perto da empresa. " +
+    "Se ele disser \"eu apareço em primeiro\", é normal: o robô pesquisa como cliente, em várias cidades, palavras e horários.");
+
+  // Pouca busca para pôr número na mensagem do cliente: o "O que falar" vira orientação interna
+  const pequenaFala = !pequena && BB < AMOSTRA_FALA;
+  if (pequenaFala) {
+    abordagem = `Ainda não mande números: foram só ${BB} buscas ${usaFoco ? `em ${lista(f!.cidades)}` : "na região"}, pouco para afirmar presença ou posição. ` +
+      "Repita a pesquisa nessa cidade com mais palavras-chave antes de citar números; por enquanto, use os outros pontos (site, medição de conversões, palavra-chave) ou só pergunte como está o retorno do anúncio.";
+    causas.length = 0;
+  }
 
   const forcaTxt = pequena ? "amostra pequena" : p < 0.4 ? "presença fraca" : p <= 0.75 ? "presença média" : "presença forte";
-  const posTxt = pos === null ? "" : noTopo ? ", em 1º quando aparece" : atras ? ", atrás de concorrentes" : "";
+  const posTxt = !posConfiavel ? "" : noTopo ? ", em 1º quando aparece" : atras ? `, em média na ${Math.round(pos!)}ª posição` : "";
   const focoTxt = usaFoco ? ` Em ${lista(f!.cidades)} (onde anuncia): ${pct(P)} (${AA}/${BB}), presença ${forcaDaPresenca(P)}.` : "";
   const resumo = `Anúncio pago: ${pct(p)} (${b.aparicoes}/${b.buscas}) em ${regiao}, ${forcaTxt}${posTxt}.${focoTxt} Orgânico: ${resumoOrganico(o)}.`;
-  return { resumo, leitura, organico, causas, abordagem, cuidados, amostraPequena: pequena };
+  return { resumo, leitura, organico, causas, abordagem, cuidados, amostraPequena: pequena || pequenaFala };
 }
 
 /** Texto corrido (para copiar/colar no WhatsApp ou no CRM). */
