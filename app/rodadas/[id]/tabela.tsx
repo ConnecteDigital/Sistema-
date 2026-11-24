@@ -67,17 +67,14 @@ export function TabelaAnunciantes({ linhas }: { linhas: Linha[] }) {
       </div>
 
       <div className="cartao overflow-x-auto">
-        <table className="w-full min-w-[900px] text-sm">
+        <table className="w-full min-w-[820px] text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase text-suave">
             <tr>
               {regioes.length > 1 && <th className="px-3 py-2">Região</th>}
-              {temLeads && <th className="px-3 py-2">Prioridade</th>}
-              <th className="px-3 py-2">Anunciante</th>
+              <th className="px-3 py-2">Anunciante · empresa</th>
               <th className="px-3 py-2">Contato</th>
-              <th className="px-3 py-2">Anúncio pago</th>
-              <th className="px-3 py-2">Orgânico</th>
+              <th className="px-3 py-2">Pago · orgânico</th>
               <th className="px-3 py-2">Onde apareceu · anúncio</th>
-              <th className="px-3 py-2">Empresa (CNPJ)</th>
             </tr>
           </thead>
           <tbody>
@@ -86,12 +83,8 @@ export function TabelaAnunciantes({ linhas }: { linhas: Linha[] }) {
               return (
                 <tr key={l.id} className="border-t border-borda align-top">
                   {regioes.length > 1 && <td className="px-3 py-2 text-suave">{l.regiao}</td>}
-                  {temLeads && (
-                    <td className="px-3 py-2">
-                      {l.prioridade && <span className={`selo ${COR_PRIORIDADE[l.prioridade] ?? ""}`}>{l.prioridade}</span>}
-                    </td>
-                  )}
-                  <td className="max-w-[300px] px-3 py-2">
+                  <td className="max-w-[340px] px-3 py-2">
+                    {temLeads && l.prioridade && <span className={`selo mb-1 ${COR_PRIORIDADE[l.prioridade] ?? ""}`}>{l.prioridade}</span>}
                     <p className="font-medium">
                       {l.leadId ? <a href={`/leads/${l.leadId}`} className="hover:underline">{l.nome ?? l.dominio}</a> : (l.nome ?? l.dominio)}
                     </p>
@@ -120,6 +113,22 @@ export function TabelaAnunciantes({ linhas }: { linhas: Linha[] }) {
                         {l.observacoes.map((o) => <li key={o}>{o}</li>)}
                       </ul>
                     )}
+                    <div className="mt-2 border-t border-borda pt-1.5 text-xs">
+                    {perfil ? <span className="text-xs text-suave">sem site</span> : (
+                      <>
+                        <ConsultaCnpj advertiserId={l.advertiserId} inicial={l.cnpj} compacto />
+                        {(() => {
+                          const outros = new Set<string>();
+                          for (const c of l.cnpjs) for (const d of sitesPorCnpj.get(c) ?? []) if (d !== l.dominio) outros.add(d);
+                          return outros.size > 0 ? (
+                            <span className="selo mt-1 bg-red-100 text-red-800" title={[...outros].join(", ")}>
+                              mesmo CNPJ em +{outros.size} site{outros.size > 1 ? "s" : ""}
+                            </span>
+                          ) : null;
+                        })()}
+                      </>
+                    )}
+                    </div>
                   </td>
                   <td className="whitespace-nowrap px-3 py-2 text-xs">
                     {l.telefone ? (
@@ -139,8 +148,8 @@ export function TabelaAnunciantes({ linhas }: { linhas: Linha[] }) {
                     <span className="block text-[11px] text-suave">
                       pos. {l.pos_media?.toFixed(1).replace(".", ",") ?? "—"} · topo {pct(l.pct_topo)} · sitelinks {pct(l.pct_sitelinks)}
                     </span>
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-2 tabular-nums">
+                    <div className="mt-2 border-t border-borda pt-1.5">
+                      <span className="block text-[11px] uppercase text-suave">Orgânico</span>
                     {l.organico ? (
                       <>
                         <span className="font-semibold">{l.organico.aparicoes}/{l.organico.buscas}</span>
@@ -149,6 +158,7 @@ export function TabelaAnunciantes({ linhas }: { linhas: Linha[] }) {
                         </span>
                       </>
                     ) : <span className="text-xs text-suave">não medido</span>}
+                    </div>
                   </td>
                   <td className="max-w-[260px] px-3 py-2 text-xs">
                     <span className="text-suave">{l.pontos.join(", ")}</span>
@@ -156,22 +166,6 @@ export function TabelaAnunciantes({ linhas }: { linhas: Linha[] }) {
                     {l.titulo && <span className="mt-1 block">“{l.titulo}”</span>}
                     {l.link && (
                       <a href={l.link} target="_blank" rel="noreferrer" className="mt-0.5 block text-marca hover:underline">abrir anúncio ↗</a>
-                    )}
-                  </td>
-                  <td className="px-3 py-2">
-                    {perfil ? <span className="text-xs text-suave">sem site</span> : (
-                      <>
-                        <ConsultaCnpj advertiserId={l.advertiserId} inicial={l.cnpj} compacto />
-                        {(() => {
-                          const outros = new Set<string>();
-                          for (const c of l.cnpjs) for (const d of sitesPorCnpj.get(c) ?? []) if (d !== l.dominio) outros.add(d);
-                          return outros.size > 0 ? (
-                            <span className="selo mt-1 bg-red-100 text-red-800" title={[...outros].join(", ")}>
-                              mesmo CNPJ em +{outros.size} site{outros.size > 1 ? "s" : ""}
-                            </span>
-                          ) : null;
-                        })()}
-                      </>
                     )}
                   </td>
                 </tr>

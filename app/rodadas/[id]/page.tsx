@@ -39,7 +39,7 @@ export default async function Rodada({ params, searchParams }: { params: Promise
   const regioes = [...new Set(listaBuscas.map((b) => b.locations.regions.nome))];
 
   return (
-    <main className="mx-auto max-w-6xl space-y-5 p-4">
+    <main className="mx-auto max-w-7xl space-y-5 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs text-suave">Rodada #{id} · {formatarData(run.criado_em)}</p>
