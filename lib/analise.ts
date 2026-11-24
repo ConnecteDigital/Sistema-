@@ -101,13 +101,18 @@ export function analisarAnuncio(aparicoes: Aparicao[]): Analise | null {
   const forcaDaPresenca = (x: number) => (x < 0.4 ? "fraca" : x <= 0.75 ? "média" : "forte");
 
   // --- O que os números dizem ---
-  leitura.push(`${quando} o robô fez ${b.buscas} ${b.buscas === 1 ? "busca" : "buscas"} em ${b.regiao} e o anúncio pago apareceu em ${b.aparicoes} (${pct(p)}).`.replace(b.regiao, regiao));
+  // Nome da região x nome da cidade: "Balneário Camboriú e região" (5 cidades) não é a cidade "Balneário Camboriú"
+  const cidadesRegiao = (b.porPonto ?? []).filter((x) => x.buscas > 0).map((x) => x.ponto);
+  const ondeRegiao = cidadesRegiao.length > 1
+    ? `na região inteira "${regiao}" (${cidadesRegiao.length} cidades: ${lista(cidadesRegiao, 4)})`
+    : `em ${regiao}`;
+  leitura.push(`${quando} o robô fez ${b.buscas} ${b.buscas === 1 ? "busca" : "buscas"} ${ondeRegiao} e o anúncio pago apareceu em ${b.aparicoes} (${pct(p)}).`);
   if (f && !pequena) {
-    leitura.push(`Ele só apareceu em ${lista(f.cidades)}. Contando só ${f.cidades.length === 1 ? "essa cidade" : "essas cidades"}: ` +
+    leitura.push(`Essa${f.aparicoes > 1 ? "s aparições foram" : " aparição foi"} na cidade de ${lista(f.cidades)}. Contando só ${f.cidades.length === 1 ? "essa cidade" : "essas cidades"}: ` +
       `${f.buscas} buscas e o anúncio apareceu em ${f.aparicoes} (${pct(f.presenca)}), presença ${forcaDaPresenca(f.presenca)} onde ele anuncia` +
       (f.buscas < AMOSTRA_MINIMA ? " (amostra pequena)." : "."));
     if (f.detalhe.length > 1) leitura.push(`Por cidade: ${f.detalhe.map((x) => `${x.ponto} ${x.aparicoes}/${x.buscas}`).join(", ")}.`);
-    leitura.push(`Nas outras cidades da região (${lista(f.outras)}) não apareceu.`);
+    leitura.push(`Nas outras cidades (${lista(f.outras)}) o anúncio não apareceu.`);
   }
   if (pequena) {
     leitura.push(`Amostra pequena: com só ${b.buscas} ${b.buscas === 1 ? "busca" : "buscas"} não dá para dizer se a presença é forte ou fraca. Repita a pesquisa com mais palavras-chave ou mais cidades antes de usar esse número na conversa.`);
