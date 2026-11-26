@@ -244,6 +244,16 @@ const nichos = [
   ["Serralheiro", ["{termo}", "serralheria", "serralheria perto de mim", "{termo} 24 horas"]],
   ["Caça vazamento", ["{termo}", "caça vazamento 24 horas", "detecção de vazamento", "vazamento de água"]],
   ["Limpa fossa", ["{termo}", "limpa fossa 24 horas", "limpeza de fossa", "caminhão limpa fossa"]],
+  // Digite "ar condicionado" na pesquisa. As duas primeiras vêm marcadas.
+  ["Ar condicionado", ["conserto de {termo}", "instalação de {termo}", "manutenção de {termo}", "limpeza de {termo}",
+    "{termo} não gela", "carga de gás {termo}", "técnico de {termo}", "{termo} 24 horas", "{termo} perto de mim"]],
+  // Digite "geladeira", "freezer" ou "câmara fria": o nome abaixo contém as três palavras, então o nicho é achado sozinho.
+  ["Refrigeração: geladeira, freezer, câmara fria", ["conserto de {termo}", "técnico de {termo}", "manutenção de {termo}",
+    "{termo} não gela", "assistência técnica {termo}", "{termo} 24 horas", "{termo} perto de mim",
+    "técnico de refrigeração", "refrigeração comercial"]],
+  // Clientes "premium": contrato mensal com empresas. Digite "pmoc".
+  ["PMOC e VRF (climatização para empresas)", ["{termo}", "empresa de PMOC", "manutenção de VRF", "laudo PMOC",
+    "instalação de VRF", "ar condicionado central", "manutenção de ar condicionado para empresas"]],
 ];
 
 const blocklist = [
